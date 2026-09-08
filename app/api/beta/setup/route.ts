@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 const POOLS = [
   { id: '00000000-0000-0000-0000-000000000101', suffix: 'Survivor', paid: false },
@@ -10,18 +9,17 @@ const POOLS = [
 
 export async function POST() {
   try {
-    const { user } = await requireUser();
-    const admin = createAdminClient();
-    const { data: profile } = await admin.from('profiles').select('display_name').eq('id', user.id).single();
+    const { supabase, user } = await requireUser();
+    const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
     const base = (profile?.display_name || user.email?.split('@')[0] || 'Beta Player').slice(0, 40);
 
-    const { data: existing } = await admin.from('entries').select('pool_id').eq('user_id', user.id);
+    const { data: existing } = await supabase.from('entries').select('pool_id').eq('user_id', user.id);
     const existingPools = new Set((existing || []).map((e:any) => e.pool_id));
     const created:any[] = [];
 
     for (const item of POOLS) {
       if (existingPools.has(item.id)) continue;
-      const { data, error } = await admin.from('entries').insert({
+      const { data, error } = await supabase.from('entries').insert({
         pool_id: item.id,
         user_id: user.id,
         entry_name: `${base} · ${item.suffix}`,
