@@ -25,7 +25,7 @@ export async function POST() {
         pool_id: item.id,
         user_id: user.id,
         entry_name: `${base} · ${item.suffix}`,
-        status: 'ACTIVE',
+        entry_status: 'ACTIVE',
         payment_status: item.paid ? 'PAID' : 'UNPAID',
       }).select().single();
       if (error) throw error;
@@ -34,7 +34,8 @@ export async function POST() {
 
     return NextResponse.json({ ok: true, created, message: created.length ? `Created ${created.length} beta entries.` : 'Beta entries already exist.' });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
+    const message = e instanceof Error ? e.message : (e && typeof e === 'object' && 'message' in e ? String(e.message) : 'Beta setup failed');
+    console.error('[api/beta/setup] failed', { message });
     return NextResponse.json({ error: message }, { status: message === 'UNAUTHENTICATED' ? 401 : 400 });
   }
 }
