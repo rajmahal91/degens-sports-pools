@@ -1,15 +1,10 @@
-import type { ReactNode } from "react";
-import "./globals.css";
+import './globals.css';
 
 export const metadata = {
-  title: "Degens Sports Pools",
-  description: "Survivor, Pick'em, playoff fantasy, brackets, prizes and live draws.",
+  title: 'Degens Sports Pools',
+  description: 'Multi-sport survivor, pick’em, bracket and prize draw platform',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html lang="en"><body>{children}</body></html>;
 }
