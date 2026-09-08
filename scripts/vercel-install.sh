@@ -11,7 +11,8 @@ cat \
   bundle/source.part.06.01 \
   bundle/source.part.07.00 \
   bundle/source.part.07.01 \
-  | base64 -d > /tmp/degens-source.tgz
+  | base64 --decode --ignore-garbage > /tmp/degens-source.tgz
 
+tar -tzf /tmp/degens-source.tgz >/dev/null
 tar -xzf /tmp/degens-source.tgz -C .
 npm install --no-audit --no-fund
