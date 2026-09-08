@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cat bundle/source.part.* | base64 -d > /tmp/degens-source.tgz && tar -xzf /tmp/degens-source.tgz -C . && npm install --no-audit --no-fund"
+}
