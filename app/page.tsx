@@ -44,15 +44,15 @@ export default function Home(){
     fetch('/api/bootstrap').then(async r=>{
       if(!r.ok) return;
       const b=await r.json();
-      const mappedPools:Pool[]=(b.pools||[]).map((p:any)=>({id:p.id,name:p.name,sport:p.sport,type:p.contest_type,status:p.status,season:p.season,entryFeeCents:p.entry_fee_cents,registrationClosesAt:p.registration_closes_at||undefined}));
-      const mappedEntries:Entry[]=(b.entries||[]).map((e:any)=>({id:e.id,poolId:e.pool_id,userId:e.user_id,entryName:e.entry_name,status:e.status,paymentStatus:e.payment_status}));
+      const mappedPools:Pool[]=(b.pools||[]).map((p:any)=>({id:p.id,name:p.name,sport:p.sport,type:p.contest_type||p.pool_type,status:p.status||(p.is_active?'OPEN':'CLOSED'),season:String(p.season||''),entryFeeCents:p.entry_fee_cents,registrationClosesAt:p.registration_closes_at||undefined}));
+      const mappedEntries:Entry[]=(b.entries||[]).map((e:any)=>({id:e.id,poolId:e.pool_id,userId:e.user_id,entryName:e.entry_name,status:e.status||e.entry_status,paymentStatus:e.payment_status}));
       const poolNames=new Map(mappedPools.map(p=>[p.id,p.name]));
       const entryNames=new Map(mappedEntries.map(e=>[e.id,e.entryName]));
-      const mappedPayments:PaymentRecord[]=(b.payments||[]).map((p:any)=>({id:p.id,poolId:p.pool_id,poolName:poolNames.get(p.pool_id)||'Pool',entryId:p.entry_id||undefined,entryName:entryNames.get(p.entry_id)||undefined,amountCents:p.amount_cents,method:p.method,status:p.status,reference:p.payer_reference||undefined,createdAt:p.created_at}));
-      const mappedGames=(b.games||[]).filter((g:any)=>g.week===1).map((g:any)=>({id:g.id,week:g.week,away:g.away_team_code,awayCode:g.away_team_code,home:g.home_team_code,homeCode:g.home_team_code,kickoff:g.starts_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
-      const rounds:Record<string,string>={}; (b.rounds||[]).forEach((r:any)=>{if(r.sequence===1) rounds[r.pool_id]=r.id});
+      const mappedPayments:PaymentRecord[]=(b.payments||[]).map((p:any)=>({id:p.id,poolId:p.pool_id||'',poolName:poolNames.get(p.pool_id)||'Pool',entryId:p.entry_id||undefined,entryName:entryNames.get(p.entry_id)||undefined,amountCents:p.amount_cents,method:p.method,status:p.status,reference:p.payer_reference||p.reference||undefined,createdAt:p.created_at||p.submitted_at}));
+      const mappedGames=(b.games||[]).filter((g:any)=>g.week===1).map((g:any)=>({id:g.id,week:g.week,away:g.away_team_code||g.away_team,awayCode:g.away_team_code||g.away_team,home:g.home_team_code||g.home_team,homeCode:g.home_team_code||g.home_team,kickoff:g.starts_at||g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
+      const rounds:Record<string,string>={}; (b.rounds||[]).forEach((r:any)=>{if((r.sequence||r.round_order)===1) rounds[r.pool_id]=r.id});
       if(mappedPools.length)setPools(mappedPools); if(mappedEntries.length)setEntries(mappedEntries); setPayments(mappedPayments); if(mappedGames.length)setGames(mappedGames); setRoundIds(rounds); setConnected(true);
-    }).catch(()=>{});
+    }).catch(()=>setNotice('Your account is signed in, but the pool data could not be loaded. Please refresh the page.'));
   },[]);
 
   const survivorPoolIds=new Set(pools.filter(p=>p.type==='SURVIVOR'&&p.sport==='NFL').map(p=>p.id));
