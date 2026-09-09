@@ -78,17 +78,38 @@ export default function Home(){
   }
   async function selectSurvivor(gameId:string,teamCode:string,teamName:string){
     if(!activeSurvivor || activeSurvivor.paymentStatus!=='PAID') return;
-    if(connected){
-      const r=await fetch('/api/picks/survivor',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId:activeSurvivor.id,gameId,week:1,teamCode})});
-      if(!r.ok){const j=await r.json();setNotice(j.error||'Could not save pick');return;}
+    const entryId=activeSurvivor.id;
+    const previous=survivorPicks.find(p=>p.entryId===entryId&&p.week===1);
+    setSurvivorPicks(prev=>[...prev.filter(p=>!(p.entryId===entryId&&p.week===1)),{entryId,week:1,teamCode,teamName,locked:false,result:'PENDING'}]);
+    if(!connected) return;
+    try{
+      const r=await fetch('/api/picks/survivor',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId,gameId,week:1,teamCode})});
+      if(r.ok) return;
+      const j=await r.json();
+      setSurvivorPicks(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.week===1);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.week===1)),...(previous?[previous]:[])];});
+      setNotice(j.error||'Could not save pick');
+    }catch{
+      setSurvivorPicks(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.week===1);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.week===1)),...(previous?[previous]:[])];});
+      setNotice('Could not save pick. Check your connection and try again.');
     }
-    setSurvivorPicks(prev=>[...prev.filter(p=>!(p.entryId===activeSurvivor.id&&p.week===1)),{entryId:activeSurvivor.id,week:1,teamCode,teamName,locked:false,result:'PENDING'}]);
   }
   async function togglePickem(gameId:string,teamCode:string){
     if(!pickemEntry) return;
-    if(connected){const r=await fetch('/api/picks/pickem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId:pickemEntry.id,gameId,teamCode})});if(!r.ok){const j=await r.json();setNotice(j.error||'Could not save Pick’em choice');return;}}
-    setPickem(prev=>[...prev.filter(p=>!(p.entryId===pickemEntry.id&&p.gameId===gameId)),{entryId:pickemEntry.id,gameId,teamCode}]);
+    const entryId=pickemEntry.id;
+    const previous=pickem.find(p=>p.entryId===entryId&&p.gameId===gameId);
+    setPickem(prev=>[...prev.filter(p=>!(p.entryId===entryId&&p.gameId===gameId)),{entryId,gameId,teamCode}]);
     setPickemSubmitted(false);
+    if(!connected) return;
+    try{
+      const r=await fetch('/api/picks/pickem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId,gameId,teamCode})});
+      if(r.ok) return;
+      const j=await r.json();
+      setPickem(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.gameId===gameId);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.gameId===gameId)),...(previous?[previous]:[])];});
+      setNotice(j.error||'Could not save Pick’em choice');
+    }catch{
+      setPickem(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.gameId===gameId);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.gameId===gameId)),...(previous?[previous]:[])];});
+      setNotice('Could not save Pick’em choice. Check your connection and try again.');
+    }
   }
   function submitPickem(){
     if(pickemCount!==games.length) return;
