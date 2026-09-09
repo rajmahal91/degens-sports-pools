@@ -27,6 +27,7 @@ export default function Home(){
   const [payments,setPayments]=useState<PaymentRecord[]>(demoPayments);
   const [survivorPicks,setSurvivorPicks]=useState<SurvivorPick[]>([]);
   const [pickem,setPickem]=useState<PickemSelection[]>([]);
+  const [pickemSubmitted,setPickemSubmitted]=useState(false);
   const [activeEntry,setActiveEntry]=useState('entry-r91');
   const [pickMode,setPickMode]=useState<'survivor'|'pickem'|'fantasy'>('survivor');
   const [fantasy,setFantasy]=useState(fantasySlots);
@@ -87,6 +88,12 @@ export default function Home(){
     if(!pickemEntry) return;
     if(connected){const r=await fetch('/api/picks/pickem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId:pickemEntry.id,gameId,teamCode})});if(!r.ok){const j=await r.json();setNotice(j.error||'Could not save Pick’em choice');return;}}
     setPickem(prev=>[...prev.filter(p=>!(p.entryId===pickemEntry.id&&p.gameId===gameId)),{entryId:pickemEntry.id,gameId,teamCode}]);
+    setPickemSubmitted(false);
+  }
+  function submitPickem(){
+    if(pickemCount!==games.length) return;
+    setPickemSubmitted(true);
+    setNotice(`All ${games.length} Week 1 Pick’em selections are submitted and saved.`);
   }
   function openPayment(pool:Pool,entry?:Entry){
     setPaymentPool(pool); setPaymentEntry(entry||entries.find(e=>e.poolId===pool.id)||null); setPaymentMethod('ETRANSFER'); setReference(''); setNotice(null);
@@ -134,7 +141,7 @@ export default function Home(){
     {tab==='picks'&&<section className="stack">
       <div className="segmented"><button className={pickMode==='survivor'?'selected':''} onClick={()=>setPickMode('survivor')}>Survivor</button><button className={pickMode==='pickem'?'selected':''} onClick={()=>setPickMode('pickem')}>Pick’em</button><button className={pickMode==='fantasy'?'selected':''} onClick={()=>setPickMode('fantasy')}>Playoff Fantasy</button></div>
       {pickMode==='survivor'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL SURVIVOR · WEEK 1</span><h1>Choose one team</h1></div></div><div className="entryTabs">{mySurvivorEntries.map(e=><button className={activeEntry===e.id?'entryActive':''} key={e.id} onClick={()=>setActiveEntry(e.id)}>{e.entryName}<small>{e.paymentStatus}</small></button>)}</div>{activeSurvivor?.paymentStatus!=='PAID'&&<div className="warning">This entry must be paid before a pick can be submitted.</div>}{games.map(g=><div className="gameCard" key={g.id}><div className="gameTime">{when(g.kickoff)}</div><div className="matchup"><button disabled={activeSurvivor?.paymentStatus!=='PAID'} className={selectedSurvivor?.teamCode===g.awayCode?'teamPick selectedTeam':'teamPick'} onClick={()=>selectSurvivor(g.id,g.awayCode,g.away)}><b>{g.awayCode}</b><span>{g.away}</span></button><span className="at">@</span><button disabled={activeSurvivor?.paymentStatus!=='PAID'} className={selectedSurvivor?.teamCode===g.homeCode?'teamPick selectedTeam':'teamPick'} onClick={()=>selectSurvivor(g.id,g.homeCode,g.home)}><b>{g.homeCode}</b><span>{g.home}</span></button></div></div>)}{selectedSurvivor&&<div className="stickySubmit"><span>Selected: <b>{selectedSurvivor.teamName}</b></span><button className="primary">Week 1 Pick Saved</button></div>}</>}
-      {pickMode==='pickem'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PICK’EM · WEEK 1</span><h1>{pickemCount}/{games.length} selections</h1></div></div>{games.map(g=>{const sel=pickem.find(p=>p.gameId===g.id&&p.entryId===pickemEntry?.id);return <div className="pickemGame" key={g.id}><div><strong>{g.awayCode} @ {g.homeCode}</strong><span>{when(g.kickoff)}</span></div><div className="pickButtons"><button className={sel?.teamCode===g.awayCode?'chosen':''} onClick={()=>togglePickem(g.id,g.awayCode)}>{g.awayCode}</button><button className={sel?.teamCode===g.homeCode?'chosen':''} onClick={()=>togglePickem(g.id,g.homeCode)}>{g.homeCode}</button></div></div>})}<button className="primary" disabled={pickemCount!==games.length}>Submit All Picks</button></>}
+      {pickMode==='pickem'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PICK’EM · WEEK 1</span><h1>{pickemCount}/{games.length} selections</h1></div></div>{games.map(g=>{const sel=pickem.find(p=>p.gameId===g.id&&p.entryId===pickemEntry?.id);return <div className="pickemGame" key={g.id}><div><strong>{g.awayCode} @ {g.homeCode}</strong><span>{when(g.kickoff)}</span></div><div className="pickButtons"><button className={sel?.teamCode===g.awayCode?'chosen':''} onClick={()=>togglePickem(g.id,g.awayCode)}>{g.awayCode}</button><button className={sel?.teamCode===g.homeCode?'chosen':''} onClick={()=>togglePickem(g.id,g.homeCode)}>{g.homeCode}</button></div></div>})}{pickemSubmitted&&<div className="notice">All {games.length} Week 1 Pick’em selections are submitted and saved.</div>}<button className="primary" disabled={pickemCount!==games.length||pickemSubmitted} onClick={submitPickem}>{pickemSubmitted?'Week 1 Picks Submitted':'Submit All Picks'}</button></>}
       {pickMode==='fantasy'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PLAYOFF FANTASY</span><h1>Wild Card Lineup</h1></div><div className="scoreBadge">{fantasyFilled}/6</div></div><div className="ruleBox"><strong>QB · RB · RB · WR · WR · TE</strong><span>Each player can be used only once by this entry across the entire postseason. Total fantasy points accumulate through the Super Bowl.</span></div><div className="used"><span>Already used</span>{usedPlayers.map(p=><b key={p}>{p}</b>)}</div><div className="lineup">{fantasy.map((slot,i)=><button className="slot" key={slot.label} onClick={()=>setShowFantasyPicker(i)}><span className="slotPos">{slot.label}</span><span className="slotPlayer">{slot.player||'Select player'}</span><span>›</span></button>)}</div><button className="primary" disabled={fantasyFilled<6}>Submit Wild Card Lineup</button></>}
     </section>}
 
