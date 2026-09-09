@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { gradeNFLWeek, syncAndGradeNFLWeek } from '@/lib/sports/nfl-operations';
 
 async function managerContext(poolId:string){
@@ -92,20 +91,19 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
     }
     if(body.action==='run_scoring'){
       const week=Math.max(1,Math.min(22,Number(body.week)||1));
-      const result=await syncAndGradeNFLWeek(Number(pool.season),week,body.seasonType==='POST'?'POST':'REG');
+      const result=await syncAndGradeNFLWeek(Number(pool.season),week,body.seasonType==='POST'?'POST':'REG',supabase,poolId);
       return NextResponse.json({success:true,result});
     }
     if(body.action==='correct_game'){
       const gameId=String(body.gameId||'');
       const homeScore=Number(body.homeScore),awayScore=Number(body.awayScore);
       if(!gameId||!Number.isInteger(homeScore)||homeScore<0||!Number.isInteger(awayScore)||awayScore<0)return NextResponse.json({error:'Enter valid final scores.'},{status:400});
-      const admin=createAdminClient();
-      const {data:game}=await admin.from('games').select('id,season,week,home_team,away_team').eq('id',gameId).eq('sport','NFL').eq('season',pool.season).maybeSingle();
+      const {data:game}=await supabase.from('games').select('id,season,week,home_team,away_team').eq('id',gameId).eq('sport','NFL').eq('season',pool.season).maybeSingle();
       if(!game)return NextResponse.json({error:'Game not found for this league season.'},{status:404});
       const winnerTeam=homeScore===awayScore?null:homeScore>awayScore?game.home_team:game.away_team;
-      const {error}=await admin.from('games').update({home_score:homeScore,away_score:awayScore,winner_team:winnerTeam,status:'FINAL',updated_at:new Date().toISOString()}).eq('id',game.id);
+      const {error}=await supabase.from('games').update({home_score:homeScore,away_score:awayScore,winner_team:winnerTeam,status:'FINAL',updated_at:new Date().toISOString()}).eq('id',game.id);
       if(error)throw error;
-      const result=await gradeNFLWeek(Number(game.season),Number(game.week));
+      const result=await gradeNFLWeek(Number(game.season),Number(game.week),new Date(),supabase,poolId);
       return NextResponse.json({success:true,result});
     }
     return NextResponse.json({error:'Unknown action.'},{status:400});

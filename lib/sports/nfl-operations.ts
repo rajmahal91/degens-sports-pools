@@ -21,8 +21,8 @@ export function pickLockAt(game:any,weekGames:any[],mode:string){
   return weeklyDeadline&&weeklyDeadline<kickoff?weeklyDeadline:kickoff;
 }
 
-export async function syncNFLWeek(season:number,week:number,seasonType:SeasonType='REG'){
-  const admin=createAdminClient();
+export async function syncNFLWeek(season:number,week:number,seasonType:SeasonType='REG',client?:any){
+  const admin=client||createAdminClient();
   const provider=getNFLScoreProvider();
   const games=await provider.gamesByWeek(String(season),week,seasonType);
   const rows=games.map(game=>({
@@ -38,7 +38,7 @@ export async function syncNFLWeek(season:number,week:number,seasonType:SeasonTyp
     if(existing){
       const {error}=await admin.from('games').update(row).eq('id',existing.id);
       if(error)throw new Error(error.message);
-    }else{
+    }else if(!client){
       const {error}=await admin.from('games').insert(row);
       if(error)throw new Error(error.message);
     }
@@ -46,13 +46,13 @@ export async function syncNFLWeek(season:number,week:number,seasonType:SeasonTyp
   return {provider:provider.name,synced:rows.length};
 }
 
-export async function gradeNFLWeek(season:number,week:number,now=new Date()){
-  const admin=createAdminClient();
+export async function gradeNFLWeek(season:number,week:number,now=new Date(),client?:any,poolId?:string){
+  const admin=client||createAdminClient();
   const {data:games,error:gamesError}=await admin.from('games').select('*').eq('sport','NFL').eq('season',season).eq('week',week);
   if(gamesError)throw gamesError;
-  const weekGames=games||[];
+  const weekGames:any[]=(games||[]) as any[];
   const finalGames=weekGames.filter(game=>game.status==='FINAL');
-  const gameById=new Map(weekGames.map(game=>[game.id,game]));
+  const gameById=new Map<string,any>(weekGames.map((game:any)=>[game.id,game]));
   const finalIds=finalGames.map(game=>game.id);
   let pickemGraded=0,survivorGraded=0,eliminated=0,missed=0;
 
@@ -68,12 +68,14 @@ export async function gradeNFLWeek(season:number,week:number,now=new Date()){
     }
   }
 
-  const {data:pools,error:poolsError}=await admin.from('pools').select('id,scoring_settings').eq('sport','NFL').eq('season',season).eq('pool_type','SURVIVOR').eq('is_active',true);
+  let poolsQuery=admin.from('pools').select('id,scoring_settings').eq('sport','NFL').eq('season',season).eq('pool_type','SURVIVOR').eq('is_active',true);
+  if(poolId)poolsQuery=poolsQuery.eq('id',poolId);
+  const {data:pools,error:poolsError}=await poolsQuery;
   if(poolsError)throw poolsError;
   for(const pool of pools||[]){
     const {data:entries,error:entriesError}=await admin.from('entries').select('id,entry_status,payment_status').eq('pool_id',pool.id);
     if(entriesError)throw entriesError;
-    const entryIds=(entries||[]).map(entry=>entry.id);
+    const entryIds=(entries||[]).map((entry:any)=>entry.id);
     if(!entryIds.length)continue;
     const {data:picks,error:picksError}=await admin.from('survivor_picks').select('id,entry_id,game_id,team_code,result').in('entry_id',entryIds).eq('week',week);
     if(picksError)throw picksError;
@@ -92,8 +94,8 @@ export async function gradeNFLWeek(season:number,week:number,now=new Date()){
     const settings=pool.scoring_settings||{};
     const deadline=deadlineForWeek(weekGames,settings.deadline_mode||'GAME_KICKOFF');
     if(settings.missed_pick_elimination!==false&&deadline&&now>=deadline){
-      const picked=new Set((picks||[]).map(pick=>pick.entry_id));
-      const missing=(entries||[]).filter(entry=>entry.entry_status==='ACTIVE'&&entry.payment_status==='PAID'&&!picked.has(entry.id));
+      const picked=new Set((picks||[]).map((pick:any)=>pick.entry_id));
+      const missing=(entries||[]).filter((entry:any)=>entry.entry_status==='ACTIVE'&&entry.payment_status==='PAID'&&!picked.has(entry.id));
       for(const entry of missing){
         const {error}=await admin.from('entries').update({entry_status:'ELIMINATED'}).eq('id',entry.id).eq('pool_id',pool.id).eq('entry_status','ACTIVE');
         if(error)throw error; missed++; eliminated++;
@@ -103,8 +105,8 @@ export async function gradeNFLWeek(season:number,week:number,now=new Date()){
   return {season,week,finalGames:finalGames.length,pickemGraded,survivorGraded,eliminated,missed};
 }
 
-export async function syncAndGradeNFLWeek(season:number,week:number,seasonType:SeasonType='REG'){
-  const sync=await syncNFLWeek(season,week,seasonType);
-  const grading=await gradeNFLWeek(season,week);
+export async function syncAndGradeNFLWeek(season:number,week:number,seasonType:SeasonType='REG',client?:any,poolId?:string){
+  const sync=await syncNFLWeek(season,week,seasonType,client);
+  const grading=await gradeNFLWeek(season,week,new Date(),client,poolId);
   return {...sync,...grading};
 }
