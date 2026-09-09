@@ -6,9 +6,13 @@ export async function POST(request: Request) {
     const { supabase, user } = await requireUser();
     const { entryId, gameId, teamCode } = await request.json();
     if (!entryId || !gameId || !teamCode) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    const { data: entry } = await supabase.from('entries').select('id,user_id').eq('id', entryId).single();
+    const { data: entry } = await supabase.from('entries').select('id,user_id,payment_status,entry_status').eq('id', entryId).single();
     if (!entry || entry.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    const { data, error } = await supabase.from('pickem_picks').upsert({ entry_id: entryId, game_id: gameId, team_code: teamCode }, { onConflict: 'entry_id,game_id' }).select().single();
+    if (entry.payment_status !== 'PAID' || entry.entry_status !== 'ACTIVE') return NextResponse.json({ error: 'This entry is not eligible to make picks.' }, { status: 403 });
+    const { data: game } = await supabase.from('games').select('id,home_team,away_team,kickoff_at,status').eq('id', gameId).single();
+    if (!game || ![game.home_team,game.away_team].includes(teamCode)) return NextResponse.json({ error: 'Invalid team selection.' }, { status: 400 });
+    if (game.status !== 'SCHEDULED' || new Date(game.kickoff_at).getTime() <= Date.now()) return NextResponse.json({ error: 'This game is already locked.' }, { status: 400 });
+    const { data, error } = await supabase.from('pickem_picks').upsert({ entry_id: entryId, game_id: gameId, selected_team: teamCode }, { onConflict: 'entry_id,game_id' }).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ pick: data });
   } catch (e) {

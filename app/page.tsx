@@ -49,7 +49,10 @@ export default function Home(){
       const entryNames=new Map(mappedEntries.map(e=>[e.id,e.entryName]));
       const mappedPayments:PaymentRecord[]=(b.payments||[]).map((p:any)=>{const poolId=p.pool_id||mappedEntries.find(e=>e.id===p.entry_id)?.poolId||'';return {id:p.id,poolId,poolName:poolNames.get(poolId)||'Pool',entryId:p.entry_id||undefined,entryName:entryNames.get(p.entry_id)||undefined,amountCents:p.amount_cents,method:p.method,status:p.status,reference:p.payer_reference||p.reference||undefined,createdAt:p.created_at||p.submitted_at}});
       const mappedGames=(b.games||[]).filter((g:any)=>g.week===1).map((g:any)=>({id:g.id,week:g.week,away:g.away_team_code||g.away_team,awayCode:g.away_team_code||g.away_team,home:g.home_team_code||g.home_team,homeCode:g.home_team_code||g.home_team,kickoff:g.starts_at||g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
-      if(mappedPools.length)setPools(mappedPools); if(mappedEntries.length)setEntries(mappedEntries); setPayments(mappedPayments); if(mappedGames.length)setGames(mappedGames); setConnected(true);
+      const gameById=new Map(mappedGames.map((g:any)=>[g.id,g]));
+      const mappedSurvivor:SurvivorPick[]=(b.survivor||[]).map((p:any)=>{const g:any=gameById.get(p.game_id);const teamCode=p.team_code;return {entryId:p.entry_id,week:p.week,teamCode,teamName:teamCode===g?.homeCode?g.home:teamCode===g?.awayCode?g.away:teamCode,locked:g?g.status!=='SCHEDULED'||new Date(g.kickoff).getTime()<=Date.now():false,result:p.result||'PENDING'}});
+      const mappedPickem:PickemSelection[]=(b.pickem||[]).map((p:any)=>({entryId:p.entry_id,gameId:p.game_id,teamCode:p.selected_team||p.team_code}));
+      if(mappedPools.length)setPools(mappedPools); if(mappedEntries.length)setEntries(mappedEntries); setPayments(mappedPayments); if(mappedGames.length)setGames(mappedGames); setSurvivorPicks(mappedSurvivor); setPickem(mappedPickem); setConnected(true);
     }).catch(()=>setNotice('Your account is signed in, but the pool data could not be loaded. Please refresh the page.'));
   },[]);
 
