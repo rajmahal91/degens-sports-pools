@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 
 export default function NewLeaguePage(){
-  const [form,setForm]=useState({organizationName:'',name:'',sport:'NFL',poolType:'SURVIVOR',season:'2026',entryFee:'0',maxEntries:'1',deadlineMode:'GAME_KICKOFF',strictMissedPicks:true});
+  const [form,setForm]=useState({organizationName:'',name:'',sport:'NFL',poolType:'SURVIVOR',season:'2026',entryFee:'0',maxEntries:'1',maxParticipants:'1000',deadlineMode:'GAME_KICKOFF',strictMissedPicks:true});
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
   const [created,setCreated]=useState<{name:string;inviteCode:string}|null>(null);
@@ -30,6 +30,7 @@ export default function NewLeaguePage(){
       <label className="fieldLabel">Season<input className="textInput" type="number" min="2020" max="2100" value={form.season} onChange={e=>update('season',e.target.value)} required/></label>
       <label className="fieldLabel">Entry fee (CAD)<input className="textInput" type="number" min="0" step="1" value={form.entryFee} onChange={e=>update('entryFee',e.target.value)} required/></label>
       <label className="fieldLabel">Maximum entries per member<input className="textInput" type="number" min="1" max="100" value={form.maxEntries} onChange={e=>update('maxEntries',e.target.value)} required/></label>
+      <label className="fieldLabel">Maximum participants<input className="textInput" type="number" min="1" max="1000" value={form.maxParticipants} onChange={e=>update('maxParticipants',e.target.value)} required/></label>
       <label className="fieldLabel">Pick deadline<select className="textInput" value={form.deadlineMode} onChange={e=>update('deadlineMode',e.target.value)}><option value="GAME_KICKOFF">Each game’s kickoff</option><option value="SUNDAY_10AM_PT">Sunday at 10:00 AM PT</option></select></label>
       <label className="method"><input type="checkbox" checked={form.strictMissedPicks} onChange={e=>update('strictMissedPicks',e.target.checked)}/><b>Eliminate Survivor entries that miss the deadline</b></label>
       {error&&<div className="warning">{error}</div>}<button className="primary" type="submit" disabled={saving}>{saving?'Creating…':'Create League'}</button>

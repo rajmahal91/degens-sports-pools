@@ -20,6 +20,7 @@ export async function POST(request:Request){
     const season=Number(body.season||new Date().getUTCFullYear());
     const entryFeeCents=Math.max(0,Math.round(Number(body.entryFee||0)*100));
     const maxEntries=Math.min(100,Math.max(1,Number(body.maxEntries||1)));
+    const maxParticipants=Math.min(1000,Math.max(1,Number(body.maxParticipants||1000)));
     if(name.length<2||!SPORTS.has(sport)||!TYPES.has(poolType)||season<2026||season>2100){
       return NextResponse.json({error:'Enter valid league details.'},{status:400});
     }
@@ -46,6 +47,7 @@ export async function POST(request:Request){
     const {data:pool,error:poolError}=await supabase.from('pools').insert({
       organization_id:organizationId,name,sport,pool_type:poolType,season,
       entry_fee_cents:entryFeeCents,currency:'CAD',max_entries_per_user:maxEntries,
+      max_participants:maxParticipants,
       scoring_settings:scoringSettings,is_active:true,visibility:'INVITE_ONLY',
     }).select('*').single();
     if(poolError) return NextResponse.json({error:poolError.message},{status:400});

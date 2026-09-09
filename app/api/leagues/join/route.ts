@@ -16,8 +16,13 @@ export async function POST(request:Request){
     if(!invite||!invite.is_active||(invite.expires_at&&new Date(invite.expires_at)<=new Date())||(invite.max_uses&&invite.use_count>=invite.max_uses)){
       return NextResponse.json({error:'This invite code is invalid or expired.'},{status:400});
     }
-    const {data:pool}=await admin.from('pools').select('id,name,max_entries_per_user').eq('id',invite.pool_id).single();
+    const {data:pool}=await admin.from('pools').select('id,name,max_entries_per_user,max_participants').eq('id',invite.pool_id).single();
     if(!pool) return NextResponse.json({error:'League not found.'},{status:404});
+    const {data:membership}=await admin.from('league_members').select('status').eq('pool_id',pool.id).eq('user_id',user.id).maybeSingle();
+    if(membership?.status!=='ACTIVE'){
+      const {count:participantCount}=await admin.from('league_members').select('user_id',{count:'exact',head:true}).eq('pool_id',pool.id).eq('status','ACTIVE');
+      if((participantCount||0)>=(pool.max_participants||1000)) return NextResponse.json({error:'This league has reached its participant limit.'},{status:400});
+    }
     const {count}=await admin.from('entries').select('id',{count:'exact',head:true}).eq('pool_id',pool.id).eq('user_id',user.id);
     if((count||0)>=(pool.max_entries_per_user||1)) return NextResponse.json({error:'You have reached this league’s entry limit.'},{status:400});
     const {error:memberError}=await admin.from('league_members').upsert({pool_id:pool.id,user_id:user.id,role:'PLAYER',status:'ACTIVE'},{onConflict:'pool_id,user_id'});
