@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { gradeNFLWeek, syncAndGradeNFLWeek } from '@/lib/sports/nfl-operations';
 
 async function managerContext(poolId:string){
   const {supabase,user}=await requireUser();
@@ -37,7 +39,17 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       const {data}=await supabase.from(table).select('*').in('entry_id',entryIds);
       picks=data||[];
     }
-    return NextResponse.json({pool,members:members||[],entries:entries||[],payments:payments||[],picks});
+    const {data:games}=pool.sport==='NFL'?await supabase.from('games').select('*').eq('sport','NFL').eq('season',pool.season).order('kickoff_at'):{data:[]};
+    const gameById=new Map((games||[]).map(game=>[game.id,game]));
+    const standings=(entries||[]).map(entry=>{
+      const entryPicks=picks.filter(pick=>pick.entry_id===entry.id);
+      const wins=pool.pool_type==='PICKEM'?entryPicks.filter(pick=>pick.is_correct===true).length:entryPicks.filter(pick=>pick.result==='WIN').length;
+      const losses=pool.pool_type==='PICKEM'?entryPicks.filter(pick=>pick.is_correct===false).length:entryPicks.filter(pick=>pick.result==='LOSS').length;
+      const pending=entryPicks.filter(pick=>pool.pool_type==='PICKEM'?pick.is_correct==null:pick.result==null).length;
+      return {entry_id:entry.id,entry_name:entry.entry_name,entry_status:entry.entry_status,wins,losses,pending,submitted:entryPicks.length};
+    }).sort((a,b)=>Number(b.entry_status==='ACTIVE')-Number(a.entry_status==='ACTIVE')||b.wins-a.wins||a.losses-b.losses||a.entry_name.localeCompare(b.entry_name));
+    const visiblePicks=picks.map(pick=>{const game=gameById.get(pick.game_id);return {...pick,week:pick.week??game?.week,locked:!!game&&(game.status!=='SCHEDULED'||new Date(game.kickoff_at).getTime()<=Date.now())};});
+    return NextResponse.json({pool,members:members||[],entries:entries||[],payments:payments||[],picks:visiblePicks,games:games||[],standings});
   }catch(error){return failure(error);}
 }
 
@@ -57,7 +69,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{poolId:str
 
 export async function POST(request:Request,{params}:{params:Promise<{poolId:string}>}){
   try{
-    const {poolId}=await params;const {supabase,user}=await managerContext(poolId);const body=await request.json();
+    const {poolId}=await params;const {supabase,user,pool}=await managerContext(poolId);const body=await request.json();
     if(body.action==='regenerate_invite'){
       const inviteCode=randomBytes(4).toString('hex').toUpperCase();
       const codeHash=createHash('sha256').update(inviteCode).digest('hex');
@@ -77,6 +89,24 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       const {error}=await supabase.from('payments').update({status:'PAID',verified_by:user.id,verified_at:new Date().toISOString()}).eq('id',paymentId);
       if(error) throw error;await supabase.from('entries').update({payment_status:'PAID'}).eq('id',entry.id).eq('pool_id',poolId);
       return NextResponse.json({success:true});
+    }
+    if(body.action==='run_scoring'){
+      const week=Math.max(1,Math.min(22,Number(body.week)||1));
+      const result=await syncAndGradeNFLWeek(Number(pool.season),week,body.seasonType==='POST'?'POST':'REG');
+      return NextResponse.json({success:true,result});
+    }
+    if(body.action==='correct_game'){
+      const gameId=String(body.gameId||'');
+      const homeScore=Number(body.homeScore),awayScore=Number(body.awayScore);
+      if(!gameId||!Number.isInteger(homeScore)||homeScore<0||!Number.isInteger(awayScore)||awayScore<0)return NextResponse.json({error:'Enter valid final scores.'},{status:400});
+      const admin=createAdminClient();
+      const {data:game}=await admin.from('games').select('id,season,week,home_team,away_team').eq('id',gameId).eq('sport','NFL').eq('season',pool.season).maybeSingle();
+      if(!game)return NextResponse.json({error:'Game not found for this league season.'},{status:404});
+      const winnerTeam=homeScore===awayScore?null:homeScore>awayScore?game.home_team:game.away_team;
+      const {error}=await admin.from('games').update({home_score:homeScore,away_score:awayScore,winner_team:winnerTeam,status:'FINAL',updated_at:new Date().toISOString()}).eq('id',game.id);
+      if(error)throw error;
+      const result=await gradeNFLWeek(Number(game.season),Number(game.week));
+      return NextResponse.json({success:true,result});
     }
     return NextResponse.json({error:'Unknown action.'},{status:400});
   }catch(error){return failure(error);}
