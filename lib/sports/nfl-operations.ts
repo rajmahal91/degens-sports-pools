@@ -32,7 +32,17 @@ export async function syncNFLWeek(season:number,week:number,seasonType:SeasonTyp
     winner_team:game.status==='FINAL'&&game.awayScore!==game.homeScore?(Number(game.awayScore)>Number(game.homeScore)?game.awayTeamCode:game.homeTeamCode):null,
     raw:{provider:provider.name},updated_at:new Date().toISOString(),
   }));
-  if(rows.length){const {error}=await admin.from('games').upsert(rows,{onConflict:'provider_game_id'});if(error)throw error;}
+  for(const row of rows){
+    const {data:existing,error:lookupError}=await admin.from('games').select('id').eq('provider_game_id',row.provider_game_id).maybeSingle();
+    if(lookupError)throw new Error(lookupError.message);
+    if(existing){
+      const {error}=await admin.from('games').update(row).eq('id',existing.id);
+      if(error)throw new Error(error.message);
+    }else{
+      const {error}=await admin.from('games').insert(row);
+      if(error)throw new Error(error.message);
+    }
+  }
   return {provider:provider.name,synced:rows.length};
 }
 

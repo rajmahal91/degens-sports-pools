@@ -19,7 +19,7 @@ async function managerContext(poolId:string){
 }
 
 function failure(error:unknown){
-  const message=error instanceof Error?error.message:'Unknown error';
+  const message=error instanceof Error?error.message:typeof error==='object'&&error&&'message' in error?String(error.message):typeof error==='string'?error:'Unknown error';
   const status=message==='UNAUTHENTICATED'?401:message==='FORBIDDEN'?403:message==='NOT_FOUND'?404:400;
   return NextResponse.json({error:message==='NOT_FOUND'?'League not found.':message==='FORBIDDEN'?'Commissioner access required.':message},{status});
 }
@@ -109,5 +109,5 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       return NextResponse.json({success:true,result});
     }
     return NextResponse.json({error:'Unknown action.'},{status:400});
-  }catch(error){console.error('[league-management] action failed',{error:error instanceof Error?error.message:String(error)});return failure(error);}
+  }catch(error){console.error('[league-management] action failed',{error:error instanceof Error?error.message:typeof error==='object'?JSON.stringify(error):String(error)});return failure(error);}
 }
