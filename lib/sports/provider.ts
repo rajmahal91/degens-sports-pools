@@ -70,6 +70,28 @@ class DemoProvider implements NFLProvider {
   async playerStatsByWeek() { return []; }
 }
 
+class ESPNProvider implements NFLProvider {
+  name='espn';
+  async gamesByWeek(season:string,week:number,seasonType:'REG'|'POST'='REG'){
+    const seasonTypeNumber=seasonType==='POST'?3:2;
+    const url=`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${encodeURIComponent(season)}&seasontype=${seasonTypeNumber}&week=${week}`;
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error(`ESPN score sync failed (${response.status}).`);
+    const payload=await response.json();
+    return (payload.events||[]).map((event:any)=>{
+      const competition=event.competitions?.[0];
+      const home=competition?.competitors?.find((team:any)=>team.homeAway==='home');
+      const away=competition?.competitors?.find((team:any)=>team.homeAway==='away');
+      return {id:String(event.id),season,week,seasonType,awayTeamCode:String(away?.team?.abbreviation||''),homeTeamCode:String(home?.team?.abbreviation||''),startsAt:new Date(event.date).toISOString(),status:normalizeStatus(event.status?.type?.description,event.status?.type?.completed),awayScore:away?.score==null?null:Number(away.score),homeScore:home?.score==null?null:Number(home.score)};
+    }).filter((game:any)=>game.id&&game.awayTeamCode&&game.homeTeamCode);
+  }
+  async players(){return [];}
+  async playerStatsByWeek(){return [];}
+}
+
 export function getNFLProvider(): NFLProvider {
-  return (process.env.SPORTS_PROVIDER || 'demo').toLowerCase() === 'sportsdataio' ? new SportsDataIOProvider() : new DemoProvider();
+  const provider=(process.env.SPORTS_PROVIDER||'espn').toLowerCase();
+  if(provider==='sportsdataio'&&process.env.SPORTSDATAIO_API_KEY)return new SportsDataIOProvider();
+  if(provider==='demo')return new DemoProvider();
+  return new ESPNProvider();
 }

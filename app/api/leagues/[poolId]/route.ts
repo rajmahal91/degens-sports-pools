@@ -109,5 +109,5 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       return NextResponse.json({success:true,result});
     }
     return NextResponse.json({error:'Unknown action.'},{status:400});
-  }catch(error){return failure(error);}
+  }catch(error){console.error('[league-management] action failed',{error:error instanceof Error?error.message:String(error)});return failure(error);}
 }
