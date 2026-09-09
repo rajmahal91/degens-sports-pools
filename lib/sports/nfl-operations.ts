@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getNFLProvider } from '@/lib/sports/provider';
+import { getNFLScoreProvider } from '@/lib/sports/provider';
 
 type SeasonType = 'REG' | 'POST';
 
@@ -23,7 +23,7 @@ export function pickLockAt(game:any,weekGames:any[],mode:string){
 
 export async function syncNFLWeek(season:number,week:number,seasonType:SeasonType='REG'){
   const admin=createAdminClient();
-  const provider=getNFLProvider();
+  const provider=getNFLScoreProvider();
   const games=await provider.gamesByWeek(String(season),week,seasonType);
   const rows=games.map(game=>({
     provider_game_id:game.id,sport:'NFL',season:Number(game.season),week:game.week,round_label:`Week ${game.week}`,

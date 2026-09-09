@@ -95,3 +95,7 @@ export function getNFLProvider(): NFLProvider {
   if(provider==='demo')return new DemoProvider();
   return new ESPNProvider();
 }
+
+export function getNFLScoreProvider(): NFLProvider {
+  return new ESPNProvider();
+}
