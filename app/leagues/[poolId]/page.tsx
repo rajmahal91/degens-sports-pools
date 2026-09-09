@@ -17,6 +17,8 @@ export default function LeagueManagementPage(){
   if(error)return <main className="shell"><div className="warning">{error}</div><a className="authLink" href="/">Back to dashboard</a></main>;
   if(!data)return <main className="shell"><div className="wideCard"><span>Loading league…</span></div></main>;
   const entryNames=new Map(data.entries.map(entry=>[entry.id,entry.entry_name]));
+  const pickCounts=data.picks.reduce((counts:Map<string,number>,pick:any)=>counts.set(pick.entry_id,(counts.get(pick.entry_id)||0)+1),new Map<string,number>());
+  const standings=[...data.entries].sort((a,b)=>String(a.entry_status).localeCompare(String(b.entry_status))||(pickCounts.get(b.id)||0)-(pickCounts.get(a.id)||0));
   return <main className="leagueAdminPage"><header className="leagueAdminTop"><a href="/">← Dashboard</a><div><span>COMMISSIONER</span><b>{data.pool.name}</b></div><a href="/">Make Picks</a></header><section className="leagueAdminShell">
     <div className="leagueAdminHero"><div><span>{data.pool.sport} · {data.pool.pool_type.replaceAll('_',' ')}</span><h1>{data.pool.name}</h1><p>{data.members.filter(member=>member.status==='ACTIVE').length} participants · {data.entries.filter(entry=>entry.entry_status==='ACTIVE').length} active entries</p></div><button onClick={()=>action('regenerate_invite')}>Generate New Invite Code</button></div>
     {inviteCode&&<div className="inviteBanner"><span>New invitation code — copy it now</span><strong>{inviteCode}</strong></div>}{notice&&<div className="notice">{notice}</div>}
@@ -24,6 +26,7 @@ export default function LeagueManagementPage(){
       <section className="adminPanel"><h2>Members & Entries</h2>{data.entries.map(entry=><div className="manageRow" key={entry.id}><div><strong>{entry.entry_name}</strong><span>{entry.payment_status} · {entry.entry_status}</span><small>{entry.user_id}</small></div>{entry.entry_status==='ACTIVE'&&<button onClick={()=>action('deactivate_entry',{entryId:entry.id})}>Deactivate</button>}</div>)}</section>
       <section className="adminPanel"><h2>Payments</h2>{data.payments.length===0?<p className="muted">No payments submitted.</p>:data.payments.map(payment=><div className="manageRow" key={payment.id}><div><strong>{entryNames.get(payment.entry_id)||'Entry'}</strong><span>{new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(payment.amount_cents/100)} · {payment.status}</span></div>{payment.status==='PENDING'&&<button onClick={()=>action('verify_payment',{paymentId:payment.id})}>Verify Paid</button>}</div>)}</section>
       <section className="adminPanel"><h2>Submitted Picks</h2>{data.picks.length===0?<p className="muted">No picks submitted yet.</p>:data.picks.map((pick,index)=><div className="manageRow" key={pick.id||index}><div><strong>{entryNames.get(pick.entry_id)||'Entry'}</strong><span>{pick.team_code||pick.selected_team||pick.athlete_id||pick.winner_team||'Submitted'}{pick.week?` · Week ${pick.week}`:''}</span></div></div>)}</section>
+      <section className="adminPanel"><h2>League Standings</h2>{standings.map((entry,index)=><div className="manageRow" key={entry.id}><b>#{index+1}</b><div className="grow"><strong>{entry.entry_name}</strong><span>{entry.entry_status} · {pickCounts.get(entry.id)||0} picks submitted</span></div></div>)}</section>
     </div>
   </section></main>;
 }
