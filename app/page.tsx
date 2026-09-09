@@ -22,6 +22,7 @@ export default function Home(){
   const [role,setRole]=useState<UserRole>('PLAYER');
   const [pools,setPools]=useState<Pool[]>(seedPools);
   const [games,setGames]=useState(seedWeek1Games);
+  const [currentWeek,setCurrentWeek]=useState(1);
   const [connected,setConnected]=useState(false);
   const [entries,setEntries]=useState<Entry[]>(seedEntries);
   const [payments,setPayments]=useState<PaymentRecord[]>(demoPayments);
@@ -49,11 +50,11 @@ export default function Home(){
       const poolNames=new Map(mappedPools.map(p=>[p.id,p.name]));
       const entryNames=new Map(mappedEntries.map(e=>[e.id,e.entryName]));
       const mappedPayments:PaymentRecord[]=(b.payments||[]).map((p:any)=>{const poolId=p.pool_id||mappedEntries.find(e=>e.id===p.entry_id)?.poolId||'';return {id:p.id,poolId,poolName:poolNames.get(poolId)||'Pool',entryId:p.entry_id||undefined,entryName:entryNames.get(p.entry_id)||undefined,amountCents:p.amount_cents,method:p.method,status:p.status,reference:p.payer_reference||p.reference||undefined,createdAt:p.created_at||p.submitted_at}});
-      const mappedGames=(b.games||[]).filter((g:any)=>g.week===1).map((g:any)=>({id:g.id,week:g.week,away:g.away_team_code||g.away_team,awayCode:g.away_team_code||g.away_team,home:g.home_team_code||g.home_team,homeCode:g.home_team_code||g.home_team,kickoff:g.starts_at||g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
+      const mappedGames=(b.games||[]).map((g:any)=>({id:g.id,week:g.week,away:g.away_team_code||g.away_team,awayCode:g.away_team_code||g.away_team,home:g.home_team_code||g.home_team,homeCode:g.home_team_code||g.home_team,kickoff:g.starts_at||g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
       const gameById=new Map(mappedGames.map((g:any)=>[g.id,g]));
       const mappedSurvivor:SurvivorPick[]=(b.survivor||[]).map((p:any)=>{const g:any=gameById.get(p.game_id);const teamCode=p.team_code;return {entryId:p.entry_id,week:p.week,teamCode,teamName:teamCode===g?.homeCode?g.home:teamCode===g?.awayCode?g.away:teamCode,locked:g?g.status!=='SCHEDULED'||new Date(g.kickoff).getTime()<=Date.now():false,result:p.result||'PENDING'}});
       const mappedPickem:PickemSelection[]=(b.pickem||[]).map((p:any)=>({entryId:p.entry_id,gameId:p.game_id,teamCode:p.selected_team||p.team_code}));
-      if(mappedPools.length)setPools(mappedPools); if(mappedEntries.length)setEntries(mappedEntries); setPayments(mappedPayments); if(mappedGames.length)setGames(mappedGames); setSurvivorPicks(mappedSurvivor); setPickem(mappedPickem); setConnected(true);
+      if(mappedPools.length)setPools(mappedPools); if(mappedEntries.length)setEntries(mappedEntries); setPayments(mappedPayments); if(mappedGames.length)setGames(mappedGames); setSurvivorPicks(mappedSurvivor); setPickem(mappedPickem); setCurrentWeek(Number(b.currentWeek)||1); setConnected(true);
     }).catch(()=>setNotice('Your account is signed in, but the pool data could not be loaded. Please refresh the page.'));
   },[]);
 
@@ -61,13 +62,16 @@ export default function Home(){
   const pickemPoolIds=new Set(pools.filter(p=>p.type==='PICKEM'&&p.sport==='NFL').map(p=>p.id));
   const mySurvivorEntries=entries.filter(e=>survivorPoolIds.has(e.poolId));
   const activeSurvivor=entries.find(e=>e.id===activeEntry) || mySurvivorEntries[0];
-  const selectedSurvivor=survivorPicks.find(p=>p.entryId===activeSurvivor?.id && p.week===1);
+  const currentGames=games.filter(g=>g.week===currentWeek);
+  const selectedSurvivor=survivorPicks.find(p=>p.entryId===activeSurvivor?.id && p.week===currentWeek);
+  const usedSurvivorTeams=new Set(survivorPicks.filter(p=>p.entryId===activeSurvivor?.id&&p.week<currentWeek).map(p=>p.teamCode));
   const fantasyFilled=fantasy.filter(s=>s.player).length;
   const pendingPayments=payments.filter(p=>p.status==='PENDING');
   const paidTotal=payments.filter(p=>p.status==='PAID').reduce((s,p)=>s+p.amountCents,0);
   const outstanding=entries.filter(e=>e.paymentStatus==='UNPAID' && pools.find(p=>p.id===e.poolId)?.entryFeeCents).length;
   const pickemEntry=entries.find(e=>pickemPoolIds.has(e.poolId));
-  const pickemCount=pickem.filter(p=>p.entryId===pickemEntry?.id).length;
+  const currentGameIds=new Set(currentGames.map(g=>g.id));
+  const pickemCount=pickem.filter(p=>p.entryId===pickemEntry?.id&&currentGameIds.has(p.gameId)).length;
 
   function poolStatus(pool:Pool){
     const mine=entries.filter(e=>e.poolId===pool.id);
@@ -78,18 +82,19 @@ export default function Home(){
   }
   async function selectSurvivor(gameId:string,teamCode:string,teamName:string){
     if(!activeSurvivor || activeSurvivor.paymentStatus!=='PAID') return;
+    if(usedSurvivorTeams.has(teamCode)) return;
     const entryId=activeSurvivor.id;
-    const previous=survivorPicks.find(p=>p.entryId===entryId&&p.week===1);
-    setSurvivorPicks(prev=>[...prev.filter(p=>!(p.entryId===entryId&&p.week===1)),{entryId,week:1,teamCode,teamName,locked:false,result:'PENDING'}]);
+    const previous=survivorPicks.find(p=>p.entryId===entryId&&p.week===currentWeek);
+    setSurvivorPicks(prev=>[...prev.filter(p=>!(p.entryId===entryId&&p.week===currentWeek)),{entryId,week:currentWeek,teamCode,teamName,locked:false,result:'PENDING'}]);
     if(!connected) return;
     try{
-      const r=await fetch('/api/picks/survivor',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId,gameId,week:1,teamCode})});
+      const r=await fetch('/api/picks/survivor',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entryId,gameId,week:currentWeek,teamCode})});
       if(r.ok) return;
       const j=await r.json();
-      setSurvivorPicks(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.week===1);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.week===1)),...(previous?[previous]:[])];});
+      setSurvivorPicks(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.week===currentWeek);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.week===currentWeek)),...(previous?[previous]:[])];});
       setNotice(j.error||'Could not save pick');
     }catch{
-      setSurvivorPicks(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.week===1);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.week===1)),...(previous?[previous]:[])];});
+      setSurvivorPicks(prev=>{const current=prev.find(p=>p.entryId===entryId&&p.week===currentWeek);if(current?.teamCode!==teamCode)return prev;return [...prev.filter(p=>!(p.entryId===entryId&&p.week===currentWeek)),...(previous?[previous]:[])];});
       setNotice('Could not save pick. Check your connection and try again.');
     }
   }
@@ -112,9 +117,9 @@ export default function Home(){
     }
   }
   function submitPickem(){
-    if(pickemCount!==games.length) return;
+    if(pickemCount!==currentGames.length) return;
     setPickemSubmitted(true);
-    setNotice(`All ${games.length} Week 1 Pick’em selections are submitted and saved.`);
+    setNotice(`All ${currentGames.length} Week ${currentWeek} Pick’em selections are submitted and saved.`);
   }
   function openPayment(pool:Pool,entry?:Entry){
     setPaymentPool(pool); setPaymentEntry(entry||entries.find(e=>e.poolId===pool.id)||null); setPaymentMethod('ETRANSFER'); setReference(''); setNotice(null);
@@ -148,8 +153,8 @@ export default function Home(){
     {tab==='home'&&<section className="stack">
       <div className="hero"><span className="eyebrow">{role==='COMMISSIONER'?'COMMISSIONER DASHBOARD':'WELCOME BACK'}</span><h1>{role==='COMMISSIONER'?'Run every pool from one place.':'Your pools, picks and prizes in one place.'}</h1><p>{role==='COMMISSIONER'?'Payments, entries, picks, deadlines and prize draws.':'Survivor, Pick’em, playoff fantasy, brackets and live draws.'}</p></div>
       {role==='PLAYER'?<>
-        <div className="statsGrid"><div><b>{mySurvivorEntries.length}</b><span>Survivor entries</span></div><div><b>{pickemCount}/{games.length}</b><span>Pick’em made</span></div><div><b>{outstanding}</b><span>Fees due</span></div></div>
-        <div className="alert"><strong>Week 1 is open</strong><span>Make Survivor and Pick’em selections. Thursday games lock at kickoff.</span></div>
+        <div className="statsGrid"><div><b>{mySurvivorEntries.length}</b><span>Survivor entries</span></div><div><b>{pickemCount}/{currentGames.length}</b><span>Pick’em made</span></div><div><b>{outstanding}</b><span>Fees due</span></div></div>
+        <div className="alert"><strong>Week {currentWeek} is open</strong><span>Make Survivor and Pick’em selections. Each game locks at kickoff.</span></div>
       </>:<div className="statsGrid"><div><b>{entries.length}</b><span>Demo entries</span></div><div><b>{pendingPayments.length}</b><span>Payments pending</span></div><div><b>{money(paidTotal)}</b><span>Verified</span></div></div>}
       <h2>{role==='PLAYER'?'My Pools':'Pool Overview'}</h2>
       <div className="cards">{pools.map(pool=><article className="poolCard" key={pool.id}><div className="poolIcon">{pool.sport==='NFL'?'🏈':pool.sport==='NHL'?'🏒':'🏀'}</div><div className="grow"><strong>{pool.name}</strong><span>{pool.season} · {pool.type.replaceAll('_',' ')}</span><span>{pool.entryFeeCents?`${money(pool.entryFeeCents)} entry`:'Free entry'}</span></div><span className={`pill ${poolStatus(pool).toLowerCase()}`}>{poolStatus(pool)}</span></article>)}</div>
@@ -161,8 +166,8 @@ export default function Home(){
 
     {tab==='picks'&&<section className="stack">
       <div className="segmented"><button className={pickMode==='survivor'?'selected':''} onClick={()=>setPickMode('survivor')}>Survivor</button><button className={pickMode==='pickem'?'selected':''} onClick={()=>setPickMode('pickem')}>Pick’em</button><button className={pickMode==='fantasy'?'selected':''} onClick={()=>setPickMode('fantasy')}>Playoff Fantasy</button></div>
-      {pickMode==='survivor'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL SURVIVOR · WEEK 1</span><h1>Choose one team</h1></div></div><div className="entryTabs">{mySurvivorEntries.map(e=><button className={activeEntry===e.id?'entryActive':''} key={e.id} onClick={()=>setActiveEntry(e.id)}>{e.entryName}<small>{e.paymentStatus}</small></button>)}</div>{activeSurvivor?.paymentStatus!=='PAID'&&<div className="warning">This entry must be paid before a pick can be submitted.</div>}{games.map(g=><div className="gameCard" key={g.id}><div className="gameTime">{when(g.kickoff)}</div><div className="matchup"><button disabled={activeSurvivor?.paymentStatus!=='PAID'} className={selectedSurvivor?.teamCode===g.awayCode?'teamPick selectedTeam':'teamPick'} onClick={()=>selectSurvivor(g.id,g.awayCode,g.away)}><b>{g.awayCode}</b><span>{g.away}</span></button><span className="at">@</span><button disabled={activeSurvivor?.paymentStatus!=='PAID'} className={selectedSurvivor?.teamCode===g.homeCode?'teamPick selectedTeam':'teamPick'} onClick={()=>selectSurvivor(g.id,g.homeCode,g.home)}><b>{g.homeCode}</b><span>{g.home}</span></button></div></div>)}{selectedSurvivor&&<div className="stickySubmit"><span>Selected: <b>{selectedSurvivor.teamName}</b></span><button className="primary">Week 1 Pick Saved</button></div>}</>}
-      {pickMode==='pickem'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PICK’EM · WEEK 1</span><h1>{pickemCount}/{games.length} selections</h1></div></div>{games.map(g=>{const sel=pickem.find(p=>p.gameId===g.id&&p.entryId===pickemEntry?.id);return <div className="pickemGame" key={g.id}><div><strong>{g.awayCode} @ {g.homeCode}</strong><span>{when(g.kickoff)}</span></div><div className="pickButtons"><button className={sel?.teamCode===g.awayCode?'chosen':''} onClick={()=>togglePickem(g.id,g.awayCode)}>{g.awayCode}</button><button className={sel?.teamCode===g.homeCode?'chosen':''} onClick={()=>togglePickem(g.id,g.homeCode)}>{g.homeCode}</button></div></div>})}{pickemSubmitted&&<div className="notice">All {games.length} Week 1 Pick’em selections are submitted and saved.</div>}<button className="primary" disabled={pickemCount!==games.length||pickemSubmitted} onClick={submitPickem}>{pickemSubmitted?'Week 1 Picks Submitted':'Submit All Picks'}</button></>}
+      {pickMode==='survivor'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL SURVIVOR · WEEK {currentWeek}</span><h1>Choose one team</h1></div></div><div className="entryTabs">{mySurvivorEntries.map(e=><button className={activeEntry===e.id?'entryActive':''} key={e.id} onClick={()=>setActiveEntry(e.id)}>{e.entryName}<small>{e.paymentStatus}</small></button>)}</div>{activeSurvivor?.paymentStatus!=='PAID'&&<div className="warning">This entry must be paid before a pick can be submitted.</div>}{currentWeek>1&&<div className="ruleBox"><strong>Previously used teams are unavailable</strong><span>{usedSurvivorTeams.size?[...usedSurvivorTeams].join(' · '):'No teams used yet.'}</span></div>}{currentGames.map(g=><div className="gameCard" key={g.id}><div className="gameTime">{when(g.kickoff)}</div><div className="matchup"><button disabled={activeSurvivor?.paymentStatus!=='PAID'||usedSurvivorTeams.has(g.awayCode)} className={selectedSurvivor?.teamCode===g.awayCode?'teamPick selectedTeam':'teamPick'} onClick={()=>selectSurvivor(g.id,g.awayCode,g.away)}><b>{g.awayCode}</b><span>{g.away}</span></button><span className="at">@</span><button disabled={activeSurvivor?.paymentStatus!=='PAID'||usedSurvivorTeams.has(g.homeCode)} className={selectedSurvivor?.teamCode===g.homeCode?'teamPick selectedTeam':'teamPick'} onClick={()=>selectSurvivor(g.id,g.homeCode,g.home)}><b>{g.homeCode}</b><span>{g.home}</span></button></div></div>)}{selectedSurvivor&&<div className="stickySubmit"><span>Selected: <b>{selectedSurvivor.teamName}</b></span><button className="primary">Week {currentWeek} Pick Saved</button></div>}</>}
+      {pickMode==='pickem'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PICK’EM · WEEK {currentWeek}</span><h1>{pickemCount}/{currentGames.length} selections</h1></div></div>{currentGames.map(g=>{const sel=pickem.find(p=>p.gameId===g.id&&p.entryId===pickemEntry?.id);return <div className="pickemGame" key={g.id}><div><strong>{g.awayCode} @ {g.homeCode}</strong><span>{when(g.kickoff)}</span></div><div className="pickButtons"><button className={sel?.teamCode===g.awayCode?'chosen':''} onClick={()=>togglePickem(g.id,g.awayCode)}>{g.awayCode}</button><button className={sel?.teamCode===g.homeCode?'chosen':''} onClick={()=>togglePickem(g.id,g.homeCode)}>{g.homeCode}</button></div></div>})}{pickemSubmitted&&<div className="notice">All {currentGames.length} Week {currentWeek} Pick’em selections are submitted and saved.</div>}<button className="primary" disabled={pickemCount!==currentGames.length||pickemSubmitted} onClick={submitPickem}>{pickemSubmitted?`Week ${currentWeek} Picks Submitted`:'Submit All Picks'}</button></>}
       {pickMode==='fantasy'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PLAYOFF FANTASY</span><h1>Wild Card Lineup</h1></div><div className="scoreBadge">{fantasyFilled}/6</div></div><div className="ruleBox"><strong>QB · RB · RB · WR · WR · TE</strong><span>Each player can be used only once by this entry across the entire postseason. Total fantasy points accumulate through the Super Bowl.</span></div><div className="used"><span>Already used</span>{usedPlayers.map(p=><b key={p}>{p}</b>)}</div><div className="lineup">{fantasy.map((slot,i)=><button className="slot" key={slot.label} onClick={()=>setShowFantasyPicker(i)}><span className="slotPos">{slot.label}</span><span className="slotPlayer">{slot.player||'Select player'}</span><span>›</span></button>)}</div><button className="primary" disabled={fantasyFilled<6}>Submit Wild Card Lineup</button></>}
     </section>}
 

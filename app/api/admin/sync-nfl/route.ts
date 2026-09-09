@@ -17,14 +17,15 @@ export async function POST(request: Request) {
     const games = await provider.gamesByWeek(String(season), Number(week), seasonType);
     const supabase = createAdminClient();
     const rows = games.map(g => ({
-      id: g.id,
-      sport: 'NFL', season: g.season, week: g.week,
-      away_team_code: g.awayTeamCode, home_team_code: g.homeTeamCode,
-      starts_at: g.startsAt, status: g.status,
+      provider_game_id: g.id,
+      sport: 'NFL', season: Number(g.season), week: g.week, round_label: `Week ${g.week}`,
+      away_team: g.awayTeamCode, home_team: g.homeTeamCode,
+      kickoff_at: g.startsAt, status: g.status,
       away_score: g.awayScore ?? null, home_score: g.homeScore ?? null,
-      external_source: provider.name, external_game_id: g.id, updated_at: new Date().toISOString(),
+      winner_team: g.status==='FINAL'&&g.awayScore!==g.homeScore?(Number(g.awayScore)>Number(g.homeScore)?g.awayTeamCode:g.homeTeamCode):null,
+      raw: { provider: provider.name }, updated_at: new Date().toISOString(),
     }));
-    const { error } = await supabase.from('games').upsert(rows, { onConflict: 'id' });
+    const { error } = await supabase.from('games').upsert(rows, { onConflict: 'provider_game_id' });
     if (error) throw error;
     return NextResponse.json({ provider: provider.name, synced: rows.length, games: rows });
   } catch (e) {
