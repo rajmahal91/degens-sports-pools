@@ -18,14 +18,17 @@ const money = (cents:number) => new Intl.NumberFormat('en-CA',{style:'currency',
 const when = (iso:string) => new Date(iso).toLocaleString('en-CA',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 
 export default function Home(){
+  const supabaseConfigured=Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const [tab,setTab]=useState<'home'|'pools'|'picks'|'leaderboard'|'admin'>('home');
   const [role,setRole]=useState<UserRole>('PLAYER');
-  const [pools,setPools]=useState<Pool[]>(seedPools);
+  const [pools,setPools]=useState<Pool[]>(supabaseConfigured?[]:seedPools);
   const [games,setGames]=useState(seedWeek1Games);
   const [currentWeek,setCurrentWeek]=useState(1);
   const [connected,setConnected]=useState(false);
-  const [entries,setEntries]=useState<Entry[]>(seedEntries);
-  const [payments,setPayments]=useState<PaymentRecord[]>(demoPayments);
+  const [loading,setLoading]=useState(supabaseConfigured);
+  const [signedOut,setSignedOut]=useState(false);
+  const [entries,setEntries]=useState<Entry[]>(supabaseConfigured?[]:seedEntries);
+  const [payments,setPayments]=useState<PaymentRecord[]>(supabaseConfigured?[]:demoPayments);
   const [survivorPicks,setSurvivorPicks]=useState<SurvivorPick[]>([]);
   const [pendingSurvivor,setPendingSurvivor]=useState<{gameId:string;teamCode:string;teamName:string}|null>(null);
   const [savingSurvivor,setSavingSurvivor]=useState(false);
@@ -43,9 +46,13 @@ export default function Home(){
   const [notice,setNotice]=useState<string|null>(null);
 
   useEffect(()=>{
-    if(!process.env.NEXT_PUBLIC_SUPABASE_URL) return;
+    if(!supabaseConfigured) return;
     fetch('/api/bootstrap').then(async r=>{
-      if(!r.ok) return;
+      if(!r.ok){
+        setPools([]);setEntries([]);setPayments([]);setSignedOut(r.status===401);
+        if(r.status!==401)setNotice('Your pool data could not be loaded. Please refresh the page.');
+        return;
+      }
       const b=await r.json();
       const mappedPools:Pool[]=(b.pools||[]).map((p:any)=>({id:p.id,name:p.name,sport:p.sport,type:p.contest_type||p.pool_type,status:p.status||(p.is_active?'OPEN':'CLOSED'),season:String(p.season||''),entryFeeCents:p.entry_fee_cents,registrationClosesAt:p.registration_closes_at||undefined}));
       const mappedEntries:Entry[]=(b.entries||[]).map((e:any)=>({id:e.id,poolId:e.pool_id,userId:e.user_id,entryName:e.entry_name,status:e.status||e.entry_status,paymentStatus:e.payment_status}));
@@ -56,9 +63,9 @@ export default function Home(){
       const gameById=new Map(mappedGames.map((g:any)=>[g.id,g]));
       const mappedSurvivor:SurvivorPick[]=(b.survivor||[]).map((p:any)=>{const g:any=gameById.get(p.game_id);const teamCode=p.team_code;return {entryId:p.entry_id,week:p.week,teamCode,teamName:teamCode===g?.homeCode?g.home:teamCode===g?.awayCode?g.away:teamCode,locked:g?g.status!=='SCHEDULED'||new Date(g.kickoff).getTime()<=Date.now():false,result:p.result||'PENDING'}});
       const mappedPickem:PickemSelection[]=(b.pickem||[]).map((p:any)=>({entryId:p.entry_id,gameId:p.game_id,teamCode:p.selected_team||p.team_code}));
-      if(mappedPools.length)setPools(mappedPools); if(mappedEntries.length)setEntries(mappedEntries); setPayments(mappedPayments); if(mappedGames.length)setGames(mappedGames); setSurvivorPicks(mappedSurvivor); setPickem(mappedPickem); setCurrentWeek(Number(b.currentWeek)||1); setConnected(true);
-    }).catch(()=>setNotice('Your account is signed in, but the pool data could not be loaded. Please refresh the page.'));
-  },[]);
+      setPools(mappedPools);setEntries(mappedEntries);setPayments(mappedPayments);if(mappedGames.length)setGames(mappedGames);setSurvivorPicks(mappedSurvivor);setPickem(mappedPickem);setCurrentWeek(Number(b.currentWeek)||1);setSignedOut(false);setConnected(true);
+    }).catch(()=>{setPools([]);setEntries([]);setPayments([]);setNotice('Your pool data could not be loaded. Please refresh the page.');}).finally(()=>setLoading(false));
+  },[supabaseConfigured]);
 
   const survivorPoolIds=new Set(pools.filter(p=>p.type==='SURVIVOR'&&p.sport==='NFL').map(p=>p.id));
   const pickemPoolIds=new Set(pools.filter(p=>p.type==='PICKEM'&&p.sport==='NFL').map(p=>p.id));
@@ -76,6 +83,7 @@ export default function Home(){
   const pickemEntry=entries.find(e=>e.id===activeEntry&&pickemPoolIds.has(e.poolId))||pickemEntries[0];
   const currentGameIds=new Set(currentGames.map(g=>g.id));
   const pickemCount=pickem.filter(p=>p.entryId===pickemEntry?.id&&currentGameIds.has(p.gameId)).length;
+  const visibleLeaderboard=supabaseConfigured?[]:leaderboard;
 
   function poolStatus(pool:Pool){
     const mine=entries.filter(e=>e.poolId===pool.id);
@@ -174,7 +182,7 @@ export default function Home(){
         <div className="alert"><strong>Week {currentWeek} is open</strong><span>Make Survivor and Pick’em selections. Each game locks at kickoff.</span></div>
       </>:<div className="statsGrid"><div><b>{entries.length}</b><span>Demo entries</span></div><div><b>{pendingPayments.length}</b><span>Payments pending</span></div><div><b>{money(paidTotal)}</b><span>Verified</span></div></div>}
       <h2>{role==='PLAYER'?'My Pools':'Pool Overview'}</h2>
-      <div className="cards">{pools.map(pool=><article className="poolCard" key={pool.id}><div className="poolIcon">{pool.sport==='NFL'?'🏈':pool.sport==='NHL'?'🏒':'🏀'}</div><div className="grow"><strong>{pool.name}</strong><span>{pool.season} · {pool.type.replaceAll('_',' ')}</span><span>{pool.entryFeeCents?`${money(pool.entryFeeCents)} entry`:'Free entry'}</span></div>{entries.some(e=>e.poolId===pool.id)&&['SURVIVOR','PICKEM','PLAYOFF_FANTASY'].includes(pool.type)&&<button className="mini" onClick={()=>openPoolPicks(pool)}>Make Picks</button>}{role==='COMMISSIONER'&&<a className="mini manageLink" href={`/leagues/${pool.id}`}>Manage</a>}<span className={`pill ${poolStatus(pool).toLowerCase()}`}>{poolStatus(pool)}</span></article>)}</div>
+      {loading?<div className="wideCard"><span>Loading your leagues…</span></div>:signedOut?<div className="wideCard"><strong>Sign in to view your leagues</strong><span>Your pools stay private and appear only after you sign in and join with an invitation code.</span><a className="primary" href="/auth/login">Sign In or Create Account</a></div>:pools.length===0?<div className="wideCard"><strong>No leagues yet</strong><span>Join a league with the invitation code from your commissioner.</span><a className="primary" href="/join">Join a League</a></div>:<div className="cards">{pools.map(pool=><article className="poolCard" key={pool.id}><div className="poolIcon">{pool.sport==='NFL'?'🏈':pool.sport==='NHL'?'🏒':'🏀'}</div><div className="grow"><strong>{pool.name}</strong><span>{pool.season} · {pool.type.replaceAll('_',' ')}</span><span>{pool.entryFeeCents?`${money(pool.entryFeeCents)} entry`:'Free entry'}</span></div>{entries.some(e=>e.poolId===pool.id)&&['SURVIVOR','PICKEM','PLAYOFF_FANTASY'].includes(pool.type)&&<button className="mini" onClick={()=>openPoolPicks(pool)}>Make Picks</button>}{role==='COMMISSIONER'&&<a className="mini manageLink" href={`/leagues/${pool.id}`}>Manage</a>}<span className={`pill ${poolStatus(pool).toLowerCase()}`}>{poolStatus(pool)}</span></article>)}</div>}
     </section>}
 
     {tab==='pools'&&<section className="stack"><div className="sectionHeader"><div><span className="eyebrow">ENTRIES & PAYMENTS</span><h1>My Entries</h1></div><button className="mini" onClick={addSurvivorEntry}>+ Entry</button></div>
@@ -188,7 +196,7 @@ export default function Home(){
       {pickMode==='fantasy'&&<><div className="sectionHeader"><div><span className="eyebrow">NFL PLAYOFF FANTASY</span><h1>Wild Card Lineup</h1></div><div className="scoreBadge">{fantasyFilled}/6</div></div><div className="ruleBox"><strong>QB · RB · RB · WR · WR · TE</strong><span>Each player can be used only once by this entry across the entire postseason. Total fantasy points accumulate through the Super Bowl.</span></div><div className="used"><span>Already used</span>{usedPlayers.map(p=><b key={p}>{p}</b>)}</div><div className="lineup">{fantasy.map((slot,i)=><button className="slot" key={slot.label} onClick={()=>setShowFantasyPicker(i)}><span className="slotPos">{slot.label}</span><span className="slotPlayer">{slot.player||'Select player'}</span><span>›</span></button>)}</div><button className="primary" disabled={fantasyFilled<6}>Submit Wild Card Lineup</button></>}
     </section>}
 
-    {tab==='leaderboard'&&<section className="stack"><div><span className="eyebrow">LIVE STANDINGS</span><h1>Leaderboards</h1></div><div className="segmented"><button className="selected">Survivor</button><button>Pick’em</button><button>Fantasy</button></div>{leaderboard.map(row=><div className="leaderRow" key={row.name}><b>#{row.rank}</b><div><strong>{row.name}</strong><span>{row.alive?'Alive':'Eliminated'}</span></div><span className="alive">●</span></div>)}</section>}
+    {tab==='leaderboard'&&<section className="stack"><div><span className="eyebrow">LIVE STANDINGS</span><h1>Leaderboards</h1></div><div className="segmented"><button className="selected">Survivor</button><button>Pick’em</button><button>Fantasy</button></div>{visibleLeaderboard.length?visibleLeaderboard.map(row=><div className="leaderRow" key={row.name}><b>#{row.rank}</b><div><strong>{row.name}</strong><span>{row.alive?'Alive':'Eliminated'}</span></div><span className="alive">●</span></div>):<div className="wideCard"><span>Select one of your leagues to view its standings.</span></div>}</section>}
 
     {tab==='admin'&&<section className="stack"><div><span className="eyebrow">COMMISSIONER</span><h1>Control Centre</h1></div>{role!=='COMMISSIONER'?<div className="warning">Switch to Commissioner view using the button at the top.</div>:<><div className="statsGrid"><div><b>{entries.length}</b><span>Entries</span></div><div><b>{pendingPayments.length}</b><span>Pending</span></div><div><b>{money(paidTotal)}</b><span>Collected</span></div></div><h2>Payment Verification</h2>{pendingPayments.length===0?<div className="wideCard"><span>No payments awaiting verification.</span></div>:pendingPayments.map(p=><div className="adminPayment" key={p.id}><div><strong>{p.entryName}</strong><span>{p.poolName} · {p.method}</span><small>Ref: {p.reference||'—'}</small></div><div><b>{money(p.amountCents)}</b><button className="verify" onClick={()=>verifyPayment(p.id)}>Verify Paid</button></div></div>)}<h2>Commissioner Actions</h2><div className="actionGrid"><button>Send Pick Reminder</button><button>Lock Week</button><a href="/prizes">Prize Centre</a><a href="/live">Go Live</a></div></>}</section>}
 
