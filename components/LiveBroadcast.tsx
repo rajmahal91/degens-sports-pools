@@ -1,12 +1,15 @@
 'use client';
-import {useEffect,useState} from 'react';
-import {LiveKitRoom,VideoConference,useLocalParticipant} from '@livekit/components-react';
+import {useEffect,useRef,useState} from 'react';
+import {BarVisualizer,LiveKitRoom,VideoConference,useLocalParticipant} from '@livekit/components-react';
+import type {LocalAudioTrack} from 'livekit-client';
 import '@livekit/components-styles';
 import {createClient} from '@/lib/supabase/client';
 
 function CommissionerMediaControls(){
- const {localParticipant,isCameraEnabled,isMicrophoneEnabled,isScreenShareEnabled}=useLocalParticipant();
+ const {localParticipant,cameraTrack,microphoneTrack,isCameraEnabled,isMicrophoneEnabled,isScreenShareEnabled}=useLocalParticipant();
  const [busy,setBusy]=useState(''),[error,setError]=useState('');
+ const videoRef=useRef<HTMLVideoElement>(null);
+ useEffect(()=>{const track=cameraTrack?.videoTrack;if(!track||!videoRef.current)return;track.attach(videoRef.current);const element=videoRef.current;return()=>{track.detach(element)}},[cameraTrack?.trackSid,isCameraEnabled]);
  async function toggle(kind:'camera'|'microphone'|'screen'){
   setBusy(kind);setError('');
   try{
@@ -15,12 +18,16 @@ function CommissionerMediaControls(){
    if(kind==='screen')await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
   }catch(e){setError(e instanceof Error?e.message:'Your browser blocked this device. Use the site icon beside the address to allow access.')}finally{setBusy('')}
  }
- return <div className="commissionerMediaControls">
-  <button type="button" className={isMicrophoneEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('microphone')}>{isMicrophoneEnabled?'Mute Microphone':'Turn On Microphone'}</button>
-  <button type="button" className={isCameraEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('camera')}>{isCameraEnabled?'Turn Off Camera':'Turn On Camera'}</button>
-  <button type="button" className={isScreenShareEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('screen')}>{isScreenShareEnabled?'Stop Sharing':'Share Screen'}</button>
-  {error&&<span>{error}</span>}
- </div>
+ return <>
+  {isCameraEnabled&&<div className="commissionerCameraPreview"><video ref={videoRef} autoPlay playsInline muted/><b>YOUR CAMERA · LIVE</b></div>}
+  <div className="commissionerMediaControls">
+   <button type="button" className={isMicrophoneEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('microphone')}>{isMicrophoneEnabled?'Mute Microphone':'Turn On Microphone'}</button>
+   {isMicrophoneEnabled&&<div className="micLive"><BarVisualizer barCount={5} track={microphoneTrack?.audioTrack as LocalAudioTrack|undefined}/><b>MIC LIVE</b></div>}
+   <button type="button" className={isCameraEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('camera')}>{isCameraEnabled?'Turn Off Camera':'Turn On Camera'}</button>
+   <button type="button" className={isScreenShareEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('screen')}>{isScreenShareEnabled?'Stop Sharing':'Share Screen'}</button>
+   {error&&<span>{error}</span>}
+  </div>
+ </>
 }
 
 export default function LiveBroadcast({asHost}:{asHost:boolean}){
