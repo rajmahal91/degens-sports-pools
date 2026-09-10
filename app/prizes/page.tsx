@@ -164,8 +164,11 @@ export default function Prizes() {
     if (r.ok) await load();
   }
   async function deletePrize(prize: Prize) {
+    const completed = prize.prize_draws?.some((draw) => draw.drawn_at);
     const confirmed = window.confirm(
-      `Delete “${prize.title}”? This cannot be undone.`,
+      completed
+        ? `Permanently delete “${prize.title}” and its completed winner and verification record? This cannot be undone.`
+        : `Delete “${prize.title}”? This cannot be undone.`,
     );
     if (!confirmed) return;
     setDeleting(prize.id);
@@ -440,6 +443,18 @@ export default function Prizes() {
                       <a href={`/api/draws/verify?id=${d.id}`} target="_blank">
                         Verify
                       </a>
+                      {manageable.includes(p.pool_id) && (
+                        <button
+                          type="button"
+                          className="deletePrizeButton"
+                          disabled={deleting === p.id}
+                          onClick={() => deletePrize(p)}
+                        >
+                          {deleting === p.id
+                            ? "Deleting…"
+                            : "Delete Prize & Record"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
