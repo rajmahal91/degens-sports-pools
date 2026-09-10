@@ -1,28 +1,41 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {BarVisualizer,LiveKitRoom,VideoConference,useLocalParticipant} from '@livekit/components-react';
-import type {LocalAudioTrack} from 'livekit-client';
+import {LiveKitRoom,VideoConference,useLocalParticipant} from '@livekit/components-react';
+import {Track} from 'livekit-client';
 import '@livekit/components-styles';
 import {createClient} from '@/lib/supabase/client';
 
 function CommissionerMediaControls(){
- const {localParticipant,cameraTrack,microphoneTrack,isCameraEnabled,isMicrophoneEnabled,isScreenShareEnabled}=useLocalParticipant();
+ const {localParticipant,isScreenShareEnabled}=useLocalParticipant();
+ const [isCameraEnabled,setCameraEnabled]=useState(false),[isMicrophoneEnabled,setMicrophoneEnabled]=useState(false),[micLevel,setMicLevel]=useState(0);
  const [busy,setBusy]=useState(''),[error,setError]=useState('');
  const videoRef=useRef<HTMLVideoElement>(null);
- useEffect(()=>{const track=cameraTrack?.videoTrack;if(!track||!videoRef.current)return;track.attach(videoRef.current);const element=videoRef.current;return()=>{track.detach(element)}},[cameraTrack?.trackSid,isCameraEnabled]);
+ const cameraStream=useRef<MediaStream|null>(null),microphoneStream=useRef<MediaStream|null>(null),meterFrame=useRef<number>(0),audioContext=useRef<AudioContext|null>(null);
+ useEffect(()=>()=>{cameraStream.current?.getTracks().forEach(t=>t.stop());microphoneStream.current?.getTracks().forEach(t=>t.stop());cancelAnimationFrame(meterFrame.current);void audioContext.current?.close()},[]);
+ function stopMeter(){cancelAnimationFrame(meterFrame.current);void audioContext.current?.close();audioContext.current=null;setMicLevel(0)}
+ function startMeter(stream:MediaStream){
+  stopMeter();const context=new AudioContext();audioContext.current=context;const analyser=context.createAnalyser();analyser.fftSize=256;context.createMediaStreamSource(stream).connect(analyser);const values=new Uint8Array(analyser.frequencyBinCount);
+  const read=()=>{analyser.getByteFrequencyData(values);setMicLevel(values.reduce((a,b)=>a+b,0)/values.length);meterFrame.current=requestAnimationFrame(read)};read();
+ }
  async function toggle(kind:'camera'|'microphone'|'screen'){
   setBusy(kind);setError('');
   try{
-   if(kind==='camera')await localParticipant.setCameraEnabled(!isCameraEnabled);
-   if(kind==='microphone')await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+   if(kind==='camera'){
+    if(isCameraEnabled){const track=cameraStream.current?.getVideoTracks()[0];if(track)await localParticipant.unpublishTrack(track,true);cameraStream.current=null;if(videoRef.current)videoRef.current.srcObject=null;setCameraEnabled(false)}
+    else{if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera access is not supported in this browser.');const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});const track=stream.getVideoTracks()[0];if(!track)throw new Error('No camera was found.');await localParticipant.publishTrack(track,{source:Track.Source.Camera});cameraStream.current=stream;setCameraEnabled(true);requestAnimationFrame(()=>{if(videoRef.current){videoRef.current.srcObject=stream;void videoRef.current.play()}})}
+   }
+   if(kind==='microphone'){
+    if(isMicrophoneEnabled){const track=microphoneStream.current?.getAudioTracks()[0];if(track)await localParticipant.unpublishTrack(track,true);microphoneStream.current=null;stopMeter();setMicrophoneEnabled(false)}
+    else{if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone access is not supported in this browser.');const stream=await navigator.mediaDevices.getUserMedia({video:false,audio:{echoCancellation:true,noiseSuppression:true}});const track=stream.getAudioTracks()[0];if(!track)throw new Error('No microphone was found.');await localParticipant.publishTrack(track,{source:Track.Source.Microphone});microphoneStream.current=stream;startMeter(stream);setMicrophoneEnabled(true)}
+   }
    if(kind==='screen')await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
-  }catch(e){setError(e instanceof Error?e.message:'Your browser blocked this device. Use the site icon beside the address to allow access.')}finally{setBusy('')}
+  }catch(e){const detail=e instanceof Error?`${e.name}: ${e.message}`:'Unknown device error';setError(`${detail}. Check the camera and microphone permissions beside the browser address.`)}finally{setBusy('')}
  }
  return <>
   {isCameraEnabled&&<div className="commissionerCameraPreview"><video ref={videoRef} autoPlay playsInline muted/><b>YOUR CAMERA · LIVE</b></div>}
   <div className="commissionerMediaControls">
    <button type="button" className={isMicrophoneEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('microphone')}>{isMicrophoneEnabled?'Mute Microphone':'Turn On Microphone'}</button>
-   {isMicrophoneEnabled&&<div className="micLive"><BarVisualizer barCount={5} track={microphoneTrack?.audioTrack as LocalAudioTrack|undefined}/><b>MIC LIVE</b></div>}
+   {isMicrophoneEnabled&&<div className="micLive"><i style={{width:`${Math.max(8,Math.min(100,micLevel))}%`}}/><b>MIC LIVE</b></div>}
    <button type="button" className={isCameraEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('camera')}>{isCameraEnabled?'Turn Off Camera':'Turn On Camera'}</button>
    <button type="button" className={isScreenShareEnabled?'on':''} disabled={!!busy} onClick={()=>toggle('screen')}>{isScreenShareEnabled?'Stop Sharing':'Share Screen'}</button>
    {error&&<span>{error}</span>}
