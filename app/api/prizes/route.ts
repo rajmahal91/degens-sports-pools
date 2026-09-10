@@ -1,6 +1,7 @@
 import {NextResponse} from 'next/server';
 import {requireUser} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin';
+import {randomUUID} from 'crypto';
 
 async function manageablePoolIds(admin:ReturnType<typeof createAdminClient>,userId:string){
  const {data:owned}=await admin.from('pools').select('id,organizations!inner(owner_user_id)').eq('organizations.owner_user_id',userId);
@@ -13,14 +14,16 @@ export async function GET(){
   const {data:visiblePools}=await supabase.from('pools').select('id,name,sport,pool_type').order('created_at');
   const poolIds=(visiblePools||[]).map(p=>p.id);if(!poolIds.length)return NextResponse.json({prizes:[],pools:[],canManagePoolIds:[]});
   const canManage=await manageablePoolIds(admin,user.id);
-  const {data:prizes,error}=await admin.from('prizes').select('*,prize_draws(id,winner_entry_id,original_winner_entry_id,drawn_at,verification_hash,eligible_snapshot,override_reason,overridden_at)').in('pool_id',poolIds).order('draw_at');if(error)throw error;
+  const {data:prizes,error}=await admin.from('prizes').select('*,prize_draws(id,winner_entry_id,original_winner_entry_id,winner_snapshot_id,original_winner_snapshot_id,winner_name,original_winner_name,drawn_at,verification_hash,eligible_snapshot,override_reason,overridden_at)').in('pool_id',poolIds).order('draw_at');if(error)throw error;
   const result=[];
   for(const prize of prizes||[]){
    let q=admin.from('entries').select('id,entry_name,user_id,entry_status,payment_status').eq('pool_id',prize.pool_id).eq('payment_status',prize.eligibility?.payment_status||'PAID');
    if(prize.eligibility?.entry_status)q=q.eq('entry_status',prize.eligibility.entry_status);
    const {data:raw}=await q;let eligible=raw||[];
    if(prize.eligibility?.one_prize_per_entry){const {data:wins}=await admin.from('prize_draws').select('winner_entry_id,prizes!inner(pool_id)').eq('prizes.pool_id',prize.pool_id);const won=new Set((wins||[]).map((x:any)=>x.winner_entry_id));eligible=eligible.filter(e=>!won.has(e.id))}
-   result.push({...prize,title:prize.name,scheduled_draw_at:prize.draw_at,week:Number(prize.eligibility?.week)||null,eligible_count:eligible.length,my_eligible_entries:eligible.filter(e=>e.user_id===user.id).map(e=>e.entry_name),eligible_entries:canManage.has(prize.pool_id)?eligible.map(e=>({id:e.id,name:e.entry_name})):undefined});
+   const manual=Array.isArray(prize.eligibility?.manual_entries)?prize.eligibility.manual_entries:[];
+   const displayed=prize.eligibility?.draw_list_mode==='MANUAL'?manual:eligible.map(e=>({id:e.id,name:e.entry_name}));
+   result.push({...prize,title:prize.name,scheduled_draw_at:prize.draw_at,week:Number(prize.eligibility?.week)||null,eligible_count:displayed.length,my_eligible_entries:prize.eligibility?.draw_list_mode==='MANUAL'?[]:eligible.filter(e=>e.user_id===user.id).map(e=>e.entry_name),eligible_entries:canManage.has(prize.pool_id)?displayed:undefined});
   }
   return NextResponse.json({prizes:result,pools:visiblePools||[],canManagePoolIds:[...canManage]});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Could not load prizes.'},{status:401})}
@@ -41,9 +44,15 @@ export async function PATCH(req:Request){
   const {user}=await requireUser();const admin=createAdminClient();const body=await req.json(),prizeId=String(body.prizeId||'');
   const {data:prize,error}=await admin.from('prizes').select('id,pool_id,eligibility').eq('id',prizeId).single();if(error||!prize)throw error||new Error('Prize not found.');
   const canManage=await manageablePoolIds(admin,user.id);if(!canManage.has(prize.pool_id))return NextResponse.json({error:'Commissioner access required.'},{status:403});
-  const eligibility={...(prize.eligibility||{}),one_prize_per_entry:!Boolean(body.allowRepeatWinners)};
+  const eligibility:any={...(prize.eligibility||{})};
+  if(typeof body.allowRepeatWinners==='boolean')eligibility.one_prize_per_entry=!body.allowRepeatWinners;
+  if(typeof body.manualNames==='string'){
+   const names=body.manualNames.split(/\r?\n|,/).map((name:string)=>name.trim()).filter(Boolean).slice(0,2000);
+   eligibility.draw_list_mode=body.useManualList?'MANUAL':'LEAGUE';
+   eligibility.manual_entries=names.map((name:string)=>({id:`manual-${randomUUID()}`,name:name.slice(0,80)}));
+  }
   const {error:updateError}=await admin.from('prizes').update({eligibility}).eq('id',prizeId);if(updateError)throw updateError;
   await admin.from('commissioner_audit_log').insert({commissioner_id:user.id,action:'PRIZE_ELIGIBILITY_UPDATED',entity_type:'prize',entity_id:prizeId,before_state:{eligibility:prize.eligibility},after_state:{eligibility}});
-  return NextResponse.json({ok:true,allowRepeatWinners:!eligibility.one_prize_per_entry});
+  return NextResponse.json({ok:true,allowRepeatWinners:!eligibility.one_prize_per_entry,drawListMode:eligibility.draw_list_mode});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Could not update prize.'},{status:403})}
 }
