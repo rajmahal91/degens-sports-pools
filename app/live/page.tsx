@@ -61,16 +61,21 @@ export default function LiveDraw() {
     setPrizeId((x) =>
       upcoming.some((p: any) => p.id === x) ? x : upcoming[0]?.id || "",
     );
-    setIsHost((j.canManagePoolIds || []).length > 0 && !forceViewer);
+    const canHost = (j.canManagePoolIds || []).length > 0 && !forceViewer;
+    setIsHost(canHost);
+    return canHost;
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
-      viewer = params.get("viewer") === "1";
-    let code = (params.get("room") || "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 6);
-    if (!viewer && !code) {
+      hostRequested = params.get("host") === "1",
+      viewer = !hostRequested;
+    let code = hostRequested
+      ? (params.get("room") || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+          .slice(0, 6)
+      : "";
+    if (hostRequested && !code) {
       code =
         localStorage.getItem("degensMeetingCode") ||
         Array.from(
@@ -86,12 +91,20 @@ export default function LiveDraw() {
       );
     }
     setMeetingCode(code);
-    setJoinCode(code);
+    setJoinCode("");
     setViewerMode(viewer);
-    load(viewer).finally(() => setRoleReady(true));
+    load(viewer)
+      .then((canHost) => {
+        if (hostRequested && !canHost) {
+          setViewerMode(true);
+          setMeetingCode("");
+          window.history.replaceState({}, "", "/live");
+        }
+      })
+      .finally(() => setRoleReady(true));
   }, []);
   async function copyViewerLink() {
-    const link = `${window.location.origin}/live?viewer=1&room=${meetingCode}`;
+    const link = `${window.location.origin}/live`;
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
@@ -115,7 +128,7 @@ export default function LiveDraw() {
       .replace(/[^A-Z0-9]/g, "")
       .slice(0, 6);
     if (code.length < 6) return;
-    window.location.href = `/live?viewer=1&room=${code}`;
+    setMeetingCode(code);
   }
   function newMeeting() {
     const code = Array.from(
@@ -123,7 +136,7 @@ export default function LiveDraw() {
       (x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32],
     ).join("");
     localStorage.setItem("degensMeetingCode", code);
-    window.location.href = `/live?room=${code}`;
+    window.location.href = `/live?host=1&room=${code}`;
   }
   const selected = prizes.find((p) => p.id === prizeId),
     eligible = selected?.eligible_entries || [],
@@ -197,7 +210,7 @@ export default function LiveDraw() {
             >
               {copied ? "Invite Link Copied ✓" : "Copy Invite Link"}
             </button>
-            <a href={`/live?viewer=1&room=${meetingCode}`} target="_blank">
+            <a href="/live" target="_blank">
               Preview
             </a>
             <button type="button" onClick={newMeeting}>
