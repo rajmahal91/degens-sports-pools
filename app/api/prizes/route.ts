@@ -4,7 +4,10 @@ import {createAdminClient} from '@/lib/supabase/admin';
 import {randomUUID} from 'crypto';
 
 async function manageablePoolIds(admin:ReturnType<typeof createAdminClient>,userId:string){
- const {data:owned}=await admin.from('pools').select('id,organizations!inner(owner_user_id)').eq('organizations.owner_user_id',userId);
+ const {data:ownedOrgs}=await admin.from('organizations').select('id').eq('owner_user_id',userId);
+ const {data:staffOrgs}=await admin.from('organization_members').select('organization_id').eq('user_id',userId).eq('status','ACTIVE').in('role',['OWNER','ADMIN','COMMISSIONER']);
+ const orgIds=[...new Set([...(ownedOrgs||[]).map(o=>o.id),...(staffOrgs||[]).map(o=>o.organization_id)])];
+ const {data:owned}=orgIds.length?await admin.from('pools').select('id').in('organization_id',orgIds):{data:[] as {id:string}[]};
  const {data:league}=await admin.from('league_members').select('pool_id').eq('user_id',userId).eq('status','ACTIVE').in('role',['COMMISSIONER','CO_COMMISSIONER']);
  return new Set([...(owned||[]).map((p:any)=>p.id),...(league||[]).map((m:any)=>m.pool_id)]);
 }
@@ -23,7 +26,7 @@ export async function GET(){
    if(prize.eligibility?.one_prize_per_entry){const {data:wins}=await admin.from('prize_draws').select('winner_entry_id,prizes!inner(pool_id)').eq('prizes.pool_id',prize.pool_id);const won=new Set((wins||[]).map((x:any)=>x.winner_entry_id));eligible=eligible.filter(e=>!won.has(e.id))}
    const manual=Array.isArray(prize.eligibility?.manual_entries)?prize.eligibility.manual_entries:[];
    const displayed=prize.eligibility?.draw_list_mode==='MANUAL'?manual:eligible.map(e=>({id:e.id,name:e.entry_name}));
-   result.push({...prize,title:prize.name,scheduled_draw_at:prize.draw_at,week:Number(prize.eligibility?.week)||null,eligible_count:displayed.length,my_eligible_entries:prize.eligibility?.draw_list_mode==='MANUAL'?[]:eligible.filter(e=>e.user_id===user.id).map(e=>e.entry_name),eligible_entries:canManage.has(prize.pool_id)?displayed:undefined});
+   result.push({...prize,title:prize.name,scheduled_draw_at:prize.draw_at,week:Number(prize.eligibility?.week)||null,eligible_count:displayed.length,my_eligible_entries:prize.eligibility?.draw_list_mode==='MANUAL'?[]:eligible.filter(e=>e.user_id===user.id).map(e=>e.entry_name),can_manage:canManage.has(prize.pool_id),eligible_entries:canManage.has(prize.pool_id)?displayed:undefined});
   }
   return NextResponse.json({prizes:result,pools:visiblePools||[],canManagePoolIds:[...canManage]});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Could not load prizes.'},{status:401})}
