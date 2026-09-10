@@ -1,12 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
+  isTrackReference,
   LiveKitRoom,
+  RoomAudioRenderer,
+  StartAudio,
+  VideoTrack,
   VideoConference,
   useConnectionState,
   useLocalParticipant,
   useRemoteParticipants,
   useRoomContext,
+  useTracks,
 } from "@livekit/components-react";
 import { ConnectionState, Track } from "livekit-client";
 import "@livekit/components-styles";
@@ -216,6 +221,38 @@ function MeetingStatus({
   );
 }
 
+function ViewerStage() {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+      { source: Track.Source.Camera, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  ).filter(isTrackReference);
+  const primary =
+    tracks.find((track) => track.source === Track.Source.ScreenShare) ||
+    tracks.find((track) => track.source === Track.Source.Camera);
+  return (
+    <div className="viewerStage">
+      {primary ? (
+        <VideoTrack
+          key={primary.publication.trackSid}
+          trackRef={primary}
+          playsInline
+        />
+      ) : (
+        <div className="viewerWaiting">
+          <i />
+          <strong>Waiting for the commissioner</strong>
+          <span>The live camera or shared screen will appear here.</span>
+        </div>
+      )}
+      <RoomAudioRenderer />
+      <StartAudio className="viewerStartAudio" label="Tap to hear live audio" />
+    </div>
+  );
+}
+
 export default function LiveBroadcast({
   asHost,
   meetingCode,
@@ -298,7 +335,7 @@ export default function LiveBroadcast({
           }
         >
           <MeetingStatus asHost={asHost} meetingCode={meetingCode} />
-          <VideoConference />
+          {cfg.role === "host" ? <VideoConference /> : <ViewerStage />}
           {cfg.role === "host" && <CommissionerMediaControls />}
         </LiveKitRoom>
       </div>
