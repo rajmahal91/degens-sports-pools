@@ -2308,6 +2308,37 @@ p {
 .viewerStartAudio[style*="display: none"] {
   display: none !important;
 }
+.viewerSoundButton {
+  position: absolute;
+  z-index: 36;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: 10px;
+  background: #2d8cff;
+  color: #fff;
+  padding: 12px 18px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 6px 24px #0009;
+}
+.viewerSoundButton.enabled {
+  background: #1f8b4c;
+}
+.viewerSoundError {
+  position: absolute;
+  z-index: 36;
+  left: 16px;
+  right: 16px;
+  bottom: 76px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: #32161cee;
+  color: #ffadb6;
+  text-align: center;
+  font-size: 11px;
+}
 @keyframes viewerSpin {
   to {
     transform: rotate(360deg);
