@@ -4,7 +4,6 @@ import {
   isTrackReference,
   LiveKitRoom,
   RoomAudioRenderer,
-  StartAudio,
   VideoTrack,
   VideoConference,
   useConnectionState,
@@ -361,6 +360,9 @@ function MeetingStatus({
 }
 
 function ViewerStage() {
+  const room = useRoomContext();
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundError, setSoundError] = useState("");
   const tracks = useTracks(
     [
       { source: Track.Source.ScreenShare, withPlaceholder: false },
@@ -371,6 +373,17 @@ function ViewerStage() {
   const primary =
     tracks.find((track) => track.source === Track.Source.ScreenShare) ||
     tracks.find((track) => track.source === Track.Source.Camera);
+  async function enableSound() {
+    setSoundError("");
+    try {
+      await room.startAudio();
+      setSoundEnabled(true);
+    } catch (error) {
+      setSoundError(
+        error instanceof Error ? error.message : "Could not enable audio",
+      );
+    }
+  }
   return (
     <div className="viewerStage">
       {primary ? (
@@ -387,7 +400,14 @@ function ViewerStage() {
         </div>
       )}
       <RoomAudioRenderer />
-      <StartAudio className="viewerStartAudio" label="Tap to hear live audio" />
+      <button
+        type="button"
+        className={`viewerSoundButton ${soundEnabled ? "enabled" : ""}`}
+        onClick={enableSound}
+      >
+        {soundEnabled ? "🔊 Sound On" : "🔇 Turn On Sound"}
+      </button>
+      {soundError && <div className="viewerSoundError">{soundError}</div>}
     </div>
   );
 }
