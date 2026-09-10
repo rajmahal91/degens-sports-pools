@@ -1,18 +1,347 @@
-'use client';
-import {useEffect,useMemo,useState} from 'react';
-import LiveBroadcast from '@/components/LiveBroadcast';
-import {createClient} from '@/lib/supabase/client';
-type Entry={id:string;name:string};type Prize={id:string;title:string;week:number|null;eligible_count:number;eligible_entries?:Entry[];prize_draws?:any[]};
-const colors=['#c8ff35','#6ee7ff','#a78bfa','#fb7185','#fbbf24','#34d399','#60a5fa','#f472b6'];
-export default function LiveDraw(){
- const [prizes,setPrizes]=useState<Prize[]>([]),[prizeId,setPrizeId]=useState(''),[winner,setWinner]=useState<string|null>(null),[drawing,setDrawing]=useState(false),[audit,setAudit]=useState<any>(null),[isHost,setIsHost]=useState(false),[rotation,setRotation]=useState(0),[message,setMessage]=useState('');
- const [roleReady,setRoleReady]=useState(false),[viewerMode,setViewerMode]=useState(false),[copied,setCopied]=useState(false);
- async function api(path:string,init:RequestInit={}){const {data}=await createClient().auth.getSession();const headers=new Headers(init.headers);if(data.session?.access_token)headers.set('authorization',`Bearer ${data.session.access_token}`);return fetch(path,{...init,headers})}
- async function load(forceViewer=viewerMode){const r=await api('/api/prizes');const j=await r.json();if(r.status===401&&j.error==='UNAUTHENTICATED'){window.location.replace('/auth/login?next=/live&reason=session');return}if(!r.ok){setMessage(j.error||'Could not load draws');return}const upcoming=(j.prizes||[]).filter((p:any)=>!p.prize_draws?.some((d:any)=>d.drawn_at));setPrizes(upcoming);setPrizeId(x=>upcoming.some((p:any)=>p.id===x)?x:(upcoming[0]?.id||''));setIsHost((j.canManagePoolIds||[]).length>0&&!forceViewer)}
- useEffect(()=>{const viewer=new URLSearchParams(window.location.search).get('viewer')==='1';setViewerMode(viewer);load(viewer).finally(()=>setRoleReady(true))},[]);
- async function copyViewerLink(){const link=`${window.location.origin}/live?viewer=1`;try{await navigator.clipboard.writeText(link);setCopied(true);setTimeout(()=>setCopied(false),2500)}catch{window.prompt('Copy this viewer link:',link)}}
- const selected=prizes.find(p=>p.id===prizeId),eligible=selected?.eligible_entries||[],count=eligible.length;
- const gradient=useMemo(()=>count?eligible.map((_,i)=>`${colors[i%colors.length]} ${i*100/count}% ${(i+1)*100/count}%`).join(','):'#222 0 100%',[eligible,count]);
- async function draw(){if(!selected||!count||drawing)return;setDrawing(true);setWinner(null);setAudit(null);setMessage('Selecting and recording the winner…');const r=await api('/api/admin/draw',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({prizeId:selected.id})});const j=await r.json();if(!r.ok){setDrawing(false);setMessage(j.error||'Draw failed');return}const slice=360/j.eligibleCount,target=360-(j.winnerIndex*slice+slice/2);setRotation(x=>x+1800+target-(x%360));setMessage('Wheel spinning…');setTimeout(()=>{setDrawing(false);setWinner(j.winner.name);setAudit(j);setMessage('Winner recorded and draw locked.');load()},4200)}
- return <main className="drawPage"><header className="drawTop"><a href="/">← Degens</a><div><b>🔴 LIVE DRAW ROOM</b><span>{viewerMode?'Viewer mode':'Weekly verified prize wheel'}</span></div><a href="/prizes">Prize Centre</a></header>{isHost&&<section className="broadcastSetup"><div><strong>Commissioner broadcast</strong><span>Turn on Camera and Microphone, then choose Share screen and select this browser tab. Keep both camera and screen share on while spinning.</span></div><button type="button" onClick={copyViewerLink}>{copied?'Viewer Link Copied ✓':'Copy Viewer Link'}</button><a href="/live?viewer=1" target="_blank">Preview Viewer Mode</a></section>}<section className="drawLayout"><div className="broadcast">{roleReady?<LiveBroadcast key={isHost?'host':'viewer'} asHost={isHost}/>:<div className="videoPlaceholder"><strong>Preparing live room…</strong></div>}<div className="liveMeta"><b>Degens Prize Night</b><span>{isHost?'Camera · microphone · share this tab':'Watch-only · camera, audio and wheel broadcast'}</span></div></div>{isHost&&<aside className="drawControl"><span className="kicker">CURRENT DRAW</span>{prizes.length?<select value={prizeId} onChange={e=>{setPrizeId(e.target.value);setWinner(null);setAudit(null)}}>{prizes.map(p=><option key={p.id} value={p.id}>{p.week?`Week ${p.week} · `:''}{p.title}</option>)}</select>:<div className="notice">No upcoming prizes. Add one in Prize Centre.</div>}<div className="eligibleTitle"><b>Eligible paid entries</b><span>{count}</span></div><div className="chips">{eligible.slice(0,100).map(e=><span key={e.id}>{e.name}</span>)}</div><button className="drawButton" disabled={drawing||!selected||!count} onClick={draw}>{drawing?'SPINNING…':'SPIN & DRAW WINNER'}</button>{message&&<div className="notice">{message}</div>}</aside>}<section className="wheelStage"><div className="wheelPointer">▼</div><div className="wheel" style={{background:`conic-gradient(${gradient})`,transform:`rotate(${rotation}deg)`,transition:drawing?'transform 4s cubic-bezier(.08,.72,.08,1)':'none'}}>{count>0&&eligible.slice(0,Math.min(count,24)).map((e,i)=><span key={e.id} style={{transform:`rotate(${i*360/Math.min(count,24)}deg) translateY(-112px)`}}>{e.name.slice(0,12)}</span>)}</div>{winner&&<div className="winnerCard"><span>🏆 WINNER</span><h1>{winner}</h1>{audit&&<><small>Draw ID: {audit.drawId}</small><small>{audit.eligibleCount} eligible entries</small><a href={`/api/draws/verify?id=${audit.drawId}`} target="_blank">Verify draw</a></>}</div>}</section></section></main>
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import LiveBroadcast from "@/components/LiveBroadcast";
+import { createClient } from "@/lib/supabase/client";
+type Entry = { id: string; name: string };
+type Prize = {
+  id: string;
+  title: string;
+  week: number | null;
+  eligible_count: number;
+  eligible_entries?: Entry[];
+  prize_draws?: any[];
+};
+const colors = [
+  "#c8ff35",
+  "#6ee7ff",
+  "#a78bfa",
+  "#fb7185",
+  "#fbbf24",
+  "#34d399",
+  "#60a5fa",
+  "#f472b6",
+];
+export default function LiveDraw() {
+  const [prizes, setPrizes] = useState<Prize[]>([]),
+    [prizeId, setPrizeId] = useState(""),
+    [winner, setWinner] = useState<string | null>(null),
+    [drawing, setDrawing] = useState(false),
+    [audit, setAudit] = useState<any>(null),
+    [isHost, setIsHost] = useState(false),
+    [rotation, setRotation] = useState(0),
+    [message, setMessage] = useState("");
+  const [roleReady, setRoleReady] = useState(false),
+    [viewerMode, setViewerMode] = useState(false),
+    [copied, setCopied] = useState(false);
+  const [meetingCode, setMeetingCode] = useState(""),
+    [joinCode, setJoinCode] = useState(""),
+    [codeCopied, setCodeCopied] = useState(false);
+  async function api(path: string, init: RequestInit = {}) {
+    const { data } = await createClient().auth.getSession();
+    const headers = new Headers(init.headers);
+    if (data.session?.access_token)
+      headers.set("authorization", `Bearer ${data.session.access_token}`);
+    return fetch(path, { ...init, headers });
+  }
+  async function load(forceViewer = viewerMode) {
+    const r = await api("/api/prizes");
+    const j = await r.json();
+    if (r.status === 401 && j.error === "UNAUTHENTICATED") {
+      window.location.replace("/auth/login?next=/live&reason=session");
+      return;
+    }
+    if (!r.ok) {
+      setMessage(j.error || "Could not load draws");
+      return;
+    }
+    const upcoming = (j.prizes || []).filter(
+      (p: any) => !p.prize_draws?.some((d: any) => d.drawn_at),
+    );
+    setPrizes(upcoming);
+    setPrizeId((x) =>
+      upcoming.some((p: any) => p.id === x) ? x : upcoming[0]?.id || "",
+    );
+    setIsHost((j.canManagePoolIds || []).length > 0 && !forceViewer);
+  }
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search),
+      viewer = params.get("viewer") === "1";
+    let code = (params.get("room") || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 6);
+    if (!viewer && !code) {
+      code =
+        localStorage.getItem("degensMeetingCode") ||
+        Array.from(
+          crypto.getRandomValues(new Uint8Array(6)),
+          (x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32],
+        ).join("");
+      localStorage.setItem("degensMeetingCode", code);
+      params.set("room", code);
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}?${params}`,
+      );
+    }
+    setMeetingCode(code);
+    setJoinCode(code);
+    setViewerMode(viewer);
+    load(viewer).finally(() => setRoleReady(true));
+  }, []);
+  async function copyViewerLink() {
+    const link = `${window.location.origin}/live?viewer=1&room=${meetingCode}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      window.prompt("Copy this viewer link:", link);
+    }
+  }
+  async function copyMeetingCode() {
+    try {
+      await navigator.clipboard.writeText(meetingCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2500);
+    } catch {
+      window.prompt("Copy meeting code:", meetingCode);
+    }
+  }
+  function joinMeeting() {
+    const code = joinCode
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 6);
+    if (code.length < 6) return;
+    window.location.href = `/live?viewer=1&room=${code}`;
+  }
+  function newMeeting() {
+    const code = Array.from(
+      crypto.getRandomValues(new Uint8Array(6)),
+      (x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32],
+    ).join("");
+    localStorage.setItem("degensMeetingCode", code);
+    window.location.href = `/live?room=${code}`;
+  }
+  const selected = prizes.find((p) => p.id === prizeId),
+    eligible = selected?.eligible_entries || [],
+    count = eligible.length;
+  const gradient = useMemo(
+    () =>
+      count
+        ? eligible
+            .map(
+              (_, i) =>
+                `${colors[i % colors.length]} ${(i * 100) / count}% ${((i + 1) * 100) / count}%`,
+            )
+            .join(",")
+        : "#222 0 100%",
+    [eligible, count],
+  );
+  async function draw() {
+    if (!selected || !count || drawing) return;
+    setDrawing(true);
+    setWinner(null);
+    setAudit(null);
+    setMessage("Selecting and recording the winner…");
+    const r = await api("/api/admin/draw", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prizeId: selected.id }),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      setDrawing(false);
+      setMessage(j.error || "Draw failed");
+      return;
+    }
+    const slice = 360 / j.eligibleCount,
+      target = 360 - (j.winnerIndex * slice + slice / 2);
+    setRotation((x) => x + 1800 + target - (x % 360));
+    setMessage("Wheel spinning…");
+    setTimeout(() => {
+      setDrawing(false);
+      setWinner(j.winner.name);
+      setAudit(j);
+      setMessage("Winner recorded and draw locked.");
+      load();
+    }, 4200);
+  }
+  return (
+    <main className="drawPage">
+      <header className="drawTop">
+        <a href="/">← Degens</a>
+        <div>
+          <b>🔴 LIVE DRAW ROOM</b>
+          <span>{viewerMode ? "Viewer mode" : "Commissioner meeting"}</span>
+        </div>
+        <a href="/prizes">Prize Centre</a>
+      </header>
+      {isHost && meetingCode && (
+        <section className="meetingInvite">
+          <div>
+            <span>YOUR MEETING CODE</span>
+            <strong>{meetingCode}</strong>
+            <small>Members can enter this code to watch live.</small>
+          </div>
+          <div className="meetingInviteActions">
+            <button type="button" onClick={copyMeetingCode}>
+              {codeCopied ? "Code Copied ✓" : "Copy Code"}
+            </button>
+            <button
+              type="button"
+              className="invitePrimary"
+              onClick={copyViewerLink}
+            >
+              {copied ? "Invite Link Copied ✓" : "Copy Invite Link"}
+            </button>
+            <a href={`/live?viewer=1&room=${meetingCode}`} target="_blank">
+              Preview
+            </a>
+            <button type="button" onClick={newMeeting}>
+              New Meeting
+            </button>
+          </div>
+        </section>
+      )}
+      {viewerMode && !meetingCode && (
+        <section className="joinMeetingCard">
+          <span>JOIN LIVE DRAW</span>
+          <h1>Enter meeting code</h1>
+          <p>Enter the six-character code shared by your commissioner.</p>
+          <input
+            value={joinCode}
+            maxLength={6}
+            autoCapitalize="characters"
+            onChange={(e) =>
+              setJoinCode(
+                e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+              )
+            }
+            placeholder="ABC123"
+          />
+          <button
+            type="button"
+            disabled={joinCode.length !== 6}
+            onClick={joinMeeting}
+          >
+            Join as Viewer
+          </button>
+        </section>
+      )}
+      {(!viewerMode || meetingCode) && (
+        <section className="drawLayout">
+          <div className="broadcast">
+            {roleReady && meetingCode ? (
+              <LiveBroadcast
+                key={`${isHost ? "host" : "viewer"}-${meetingCode}`}
+                asHost={isHost}
+                meetingCode={meetingCode}
+              />
+            ) : (
+              <div className="videoPlaceholder">
+                <strong>Preparing live room…</strong>
+              </div>
+            )}
+            <div className="liveMeta">
+              <b>Degens Prize Night</b>
+              <span>
+                {isHost
+                  ? "Host controls · viewers are watch-only"
+                  : "Watch-only · live camera, audio and prize wheel"}
+              </span>
+            </div>
+          </div>
+          {isHost && (
+            <aside className="drawControl">
+              <span className="kicker">CURRENT DRAW</span>
+              {prizes.length ? (
+                <select
+                  value={prizeId}
+                  onChange={(e) => {
+                    setPrizeId(e.target.value);
+                    setWinner(null);
+                    setAudit(null);
+                  }}
+                >
+                  {prizes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.week ? `Week ${p.week} · ` : ""}
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="notice">
+                  No upcoming prizes. Add one in Prize Centre.
+                </div>
+              )}
+              <div className="eligibleTitle">
+                <b>Eligible paid entries</b>
+                <span>{count}</span>
+              </div>
+              <div className="chips">
+                {eligible.slice(0, 100).map((e) => (
+                  <span key={e.id}>{e.name}</span>
+                ))}
+              </div>
+              <button
+                className="drawButton"
+                disabled={drawing || !selected || !count}
+                onClick={draw}
+              >
+                {drawing ? "SPINNING…" : "SPIN & DRAW WINNER"}
+              </button>
+              {message && <div className="notice">{message}</div>}
+            </aside>
+          )}
+          <section className="wheelStage">
+            <div className="wheelPointer">▼</div>
+            <div
+              className="wheel"
+              style={{
+                background: `conic-gradient(${gradient})`,
+                transform: `rotate(${rotation}deg)`,
+                transition: drawing
+                  ? "transform 4s cubic-bezier(.08,.72,.08,1)"
+                  : "none",
+              }}
+            >
+              {count > 0 &&
+                eligible.slice(0, Math.min(count, 24)).map((e, i) => (
+                  <span
+                    key={e.id}
+                    style={{
+                      transform: `rotate(${(i * 360) / Math.min(count, 24)}deg) translateY(-112px)`,
+                    }}
+                  >
+                    {e.name.slice(0, 12)}
+                  </span>
+                ))}
+            </div>
+            {winner && (
+              <div className="winnerCard">
+                <span>🏆 WINNER</span>
+                <h1>{winner}</h1>
+                {audit && (
+                  <>
+                    <small>Draw ID: {audit.drawId}</small>
+                    <small>{audit.eligibleCount} eligible entries</small>
+                    <a
+                      href={`/api/draws/verify?id=${audit.drawId}`}
+                      target="_blank"
+                    >
+                      Verify draw
+                    </a>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        </section>
+      )}
+    </main>
+  );
 }
