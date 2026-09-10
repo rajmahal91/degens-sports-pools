@@ -10,6 +10,7 @@ function cleanCredential(raw:string|undefined,name:string){
 }
 
 function cleanLiveKitUrl(raw:string|undefined){
+ // Environment values are read fresh on every Vercel production deployment.
  if(!raw)return '';
  // Accept either the bare URL or an accidentally pasted LIVEKIT_URL= line.
  // Removing whitespace also repairs URLs copied across a visual line wrap.
