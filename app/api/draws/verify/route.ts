@@ -6,5 +6,5 @@ export async function GET(req:Request){
  if(!process.env.NEXT_PUBLIC_SUPABASE_URL)return NextResponse.json({error:'Connected mode required'},{status:503});
  const s=await createClient(); const {data:d,error}=await s.from('prize_draws').select('*').eq('id',id).single(); if(error||!d)return NextResponse.json({error:'Draw not found'},{status:404});
  const snapshot=JSON.stringify(d.eligible_snapshot); const calculated=createHash('sha256').update(`${d.id}|${snapshot}|${d.random_value}`).digest('hex');
- return NextResponse.json({drawId:d.id,verified:calculated===d.verification_hash,calculatedHash:calculated,storedHash:d.verification_hash,winnerEntryId:d.winner_entry_id,drawnAt:d.drawn_at});
+ return NextResponse.json({drawId:d.id,verified:calculated===d.verification_hash,calculatedHash:calculated,storedHash:d.verification_hash,randomlySelectedEntryId:d.original_winner_entry_id||d.winner_entry_id,currentWinnerEntryId:d.winner_entry_id,commissionerOverride:!!d.overridden_at,overrideReason:d.override_reason||null,overriddenAt:d.overridden_at||null,drawnAt:d.drawn_at});
 }
