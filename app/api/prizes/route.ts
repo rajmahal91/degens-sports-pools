@@ -207,16 +207,14 @@ export async function PATCH(req: Request) {
       .single();
     if (updateError || !saved)
       throw updateError || new Error("Prize settings were not saved.");
-    await supabase
-      .from("commissioner_audit_log")
-      .insert({
-        commissioner_id: user.id,
-        action: "PRIZE_ELIGIBILITY_UPDATED",
-        entity_type: "prize",
-        entity_id: prizeId,
-        before_state: { eligibility: prize.eligibility },
-        after_state: { eligibility },
-      });
+    await supabase.from("commissioner_audit_log").insert({
+      commissioner_id: user.id,
+      action: "PRIZE_ELIGIBILITY_UPDATED",
+      entity_type: "prize",
+      entity_id: prizeId,
+      before_state: { eligibility: prize.eligibility },
+      after_state: { eligibility },
+    });
     console.info("[api/prizes] PATCH saved", {
       prizeId,
       drawListMode: eligibility.draw_list_mode,
@@ -259,32 +257,30 @@ export async function DELETE(req: Request) {
         { status: 403 },
       );
     const admin = createAdminClient();
-    const { data: draw } = await admin
+    const { data: draws, error: drawsError } = await admin
       .from("prize_draws")
-      .select("id")
-      .eq("prize_id", prizeId)
-      .maybeSingle();
-    if (draw)
-      return NextResponse.json(
-        {
-          error:
-            "Completed prizes cannot be deleted because their verified draw record must be preserved.",
-        },
-        { status: 409 },
-      );
-    await admin
-      .from("commissioner_audit_log")
-      .insert({
-        commissioner_id: user.id,
-        action: "PRIZE_DELETED",
-        entity_type: "prize",
-        entity_id: prizeId,
-        before_state: {
-          id: prize.id,
-          pool_id: prize.pool_id,
-          name: prize.name,
-        },
-      });
+      .select("id,winner_name,drawn_at,verification_hash")
+      .eq("prize_id", prizeId);
+    if (drawsError) throw drawsError;
+    await admin.from("commissioner_audit_log").insert({
+      commissioner_id: user.id,
+      action: "PRIZE_DELETED",
+      entity_type: "prize",
+      entity_id: prizeId,
+      before_state: {
+        id: prize.id,
+        pool_id: prize.pool_id,
+        name: prize.name,
+        completed_draws: draws || [],
+      },
+    });
+    if (draws?.length) {
+      const { error: drawDeleteError } = await admin
+        .from("prize_draws")
+        .delete()
+        .eq("prize_id", prizeId);
+      if (drawDeleteError) throw drawDeleteError;
+    }
     const { error: deleteError } = await admin
       .from("prizes")
       .delete()
