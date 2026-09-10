@@ -67,8 +67,9 @@ export default function LiveDraw() {
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
-      hostRequested = params.get("host") === "1",
-      viewer = !hostRequested;
+      explicitViewer = params.get("viewer") === "1",
+      hostRequested = params.get("host") === "1" || !explicitViewer,
+      viewer = explicitViewer;
     let code = hostRequested
       ? (params.get("room") || "")
           .toUpperCase()
@@ -104,7 +105,7 @@ export default function LiveDraw() {
       .finally(() => setRoleReady(true));
   }, []);
   async function copyViewerLink() {
-    const link = `${window.location.origin}/live`;
+    const link = `${window.location.origin}/live?viewer=1`;
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
@@ -210,7 +211,7 @@ export default function LiveDraw() {
             >
               {copied ? "Invite Link Copied ✓" : "Copy Invite Link"}
             </button>
-            <a href="/live" target="_blank">
+            <a href="/live?viewer=1" target="_blank">
               Preview
             </a>
             <button type="button" onClick={newMeeting}>
