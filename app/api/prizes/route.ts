@@ -51,11 +51,13 @@ export async function PATCH(req:Request){
   if(typeof body.allowRepeatWinners==='boolean')eligibility.one_prize_per_entry=!body.allowRepeatWinners;
   if(typeof body.manualNames==='string'){
    const names=body.manualNames.split(/\r?\n|,/).map((name:string)=>name.trim()).filter(Boolean).slice(0,2000);
+   if(body.useManualList&&names.length===0)return NextResponse.json({error:'Enter at least one name before using the manual list.'},{status:400});
    eligibility.draw_list_mode=body.useManualList?'MANUAL':'LEAGUE';
    eligibility.manual_entries=names.map((name:string)=>({id:`manual-${randomUUID()}`,name:name.slice(0,80)}));
   }
-  const {error:updateError}=await supabase.from('prizes').update({eligibility}).eq('id',prizeId);if(updateError)throw updateError;
+  const {data:saved,error:updateError}=await supabase.from('prizes').update({eligibility}).eq('id',prizeId).select('id,eligibility').single();if(updateError||!saved)throw updateError||new Error('Prize settings were not saved.');
   await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,action:'PRIZE_ELIGIBILITY_UPDATED',entity_type:'prize',entity_id:prizeId,before_state:{eligibility:prize.eligibility},after_state:{eligibility}});
-  return NextResponse.json({ok:true,allowRepeatWinners:!eligibility.one_prize_per_entry,drawListMode:eligibility.draw_list_mode});
- }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Could not update prize.'},{status:403})}
+  console.info('[api/prizes] PATCH saved',{prizeId,drawListMode:eligibility.draw_list_mode,manualCount:eligibility.manual_entries?.length||0});
+  return NextResponse.json({ok:true,eligibility:saved.eligibility,allowRepeatWinners:!eligibility.one_prize_per_entry,drawListMode:eligibility.draw_list_mode,manualCount:eligibility.manual_entries?.length||0});
+ }catch(e){const message=e instanceof Error?e.message:'Could not update prize.';console.error('[api/prizes] PATCH failed',{message});return NextResponse.json({error:message},{status:403})}
 }
