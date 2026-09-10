@@ -30,6 +30,7 @@ export default function Prizes() {
     [message, setMessage] = useState("");
   const [manualDrafts, setManualDrafts] = useState<Record<string, string>>({});
   const [savingList, setSavingList] = useState<string>("");
+  const [deleting, setDeleting] = useState<string>("");
   const [poolId, setPoolId] = useState(""),
     [name, setName] = useState(""),
     [week, setWeek] = useState(1),
@@ -161,6 +162,27 @@ export default function Prizes() {
         : j.error || "Could not edit winner",
     );
     if (r.ok) await load();
+  }
+  async function deletePrize(prize: Prize) {
+    const confirmed = window.confirm(
+      `Delete “${prize.title}”? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setDeleting(prize.id);
+    setMessage("");
+    const r = await api("/api/prizes", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prizeId: prize.id }),
+    });
+    const j = await r.json();
+    setMessage(
+      r.ok
+        ? `${prize.title} was deleted.`
+        : j.error || "Could not delete prize",
+    );
+    if (r.ok) await load();
+    setDeleting("");
   }
   const upcoming = prizes.filter(
       (p) => !p.prize_draws?.some((d) => d.drawn_at),
@@ -351,6 +373,14 @@ export default function Prizes() {
                           {savingList === p.id
                             ? "Saving…"
                             : "Use League Entries"}
+                        </button>
+                        <button
+                          type="button"
+                          className="deletePrizeButton"
+                          disabled={deleting === p.id}
+                          onClick={() => deletePrize(p)}
+                        >
+                          {deleting === p.id ? "Deleting…" : "Delete Prize"}
                         </button>
                       </div>
                     </div>
