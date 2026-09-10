@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import LiveBroadcast from "@/components/LiveBroadcast";
+import LiveBroadcast, { type LiveDrawState } from "@/components/LiveBroadcast";
 import { createClient } from "@/lib/supabase/client";
 type Entry = { id: string; name: string };
 type Prize = {
@@ -29,7 +29,8 @@ export default function LiveDraw() {
     [audit, setAudit] = useState<any>(null),
     [isHost, setIsHost] = useState(false),
     [rotation, setRotation] = useState(0),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [remoteDraw, setRemoteDraw] = useState<LiveDrawState | null>(null);
   const [roleReady, setRoleReady] = useState(false),
     [viewerMode, setViewerMode] = useState(false),
     [copied, setCopied] = useState(false);
@@ -142,17 +143,39 @@ export default function LiveDraw() {
   const selected = prizes.find((p) => p.id === prizeId),
     eligible = selected?.eligible_entries || [],
     count = eligible.length;
+  const drawState = useMemo<LiveDrawState>(
+    () => ({
+      prizeId: selected?.id || "",
+      prizeTitle: selected?.title || "Waiting for prize selection",
+      week: selected?.week ?? null,
+      entries: eligible.slice(0, 24).map((entry) => entry.name),
+      eligibleCount: count,
+      rotation,
+      drawing,
+      winner,
+      drawId: audit?.drawId || null,
+    }),
+    [selected, eligible, count, rotation, drawing, winner, audit],
+  );
+  const shownState = viewerMode ? remoteDraw : drawState;
+  const shownEntries = viewerMode
+    ? (shownState?.entries || []).map((name, index) => ({
+        id: `viewer-${index}-${name}`,
+        name,
+      }))
+    : eligible;
+  const shownCount = viewerMode ? shownState?.eligibleCount || 0 : count;
   const gradient = useMemo(
     () =>
-      count
-        ? eligible
+      shownCount
+        ? shownEntries
             .map(
               (_, i) =>
-                `${colors[i % colors.length]} ${(i * 100) / count}% ${((i + 1) * 100) / count}%`,
+                `${colors[i % colors.length]} ${(i * 100) / shownEntries.length}% ${((i + 1) * 100) / shownEntries.length}%`,
             )
             .join(",")
         : "#222 0 100%",
-    [eligible, count],
+    [shownEntries, shownCount],
   );
   async function draw() {
     if (!selected || !count || drawing) return;
@@ -253,6 +276,8 @@ export default function LiveDraw() {
                 key={`${isHost ? "host" : "viewer"}-${meetingCode}`}
                 asHost={isHost}
                 meetingCode={meetingCode}
+                drawState={isHost ? drawState : undefined}
+                onDrawState={isHost ? undefined : setRemoteDraw}
               />
             ) : (
               <div className="videoPlaceholder">
@@ -312,39 +337,50 @@ export default function LiveDraw() {
             </aside>
           )}
           <section className="wheelStage">
+            <div className="livePrizeTitle">
+              <span>
+                {shownState?.week
+                  ? `WEEK ${shownState.week} PRIZE`
+                  : "CURRENT PRIZE"}
+              </span>
+              <strong>
+                {shownState?.prizeTitle || "Waiting for commissioner"}
+              </strong>
+              <small>{shownCount} eligible entries</small>
+            </div>
             <div className="wheelPointer">▼</div>
             <div
               className="wheel"
               style={{
                 background: `conic-gradient(${gradient})`,
-                transform: `rotate(${rotation}deg)`,
-                transition: drawing
+                transform: `rotate(${shownState?.rotation || 0}deg)`,
+                transition: shownState?.drawing
                   ? "transform 4s cubic-bezier(.08,.72,.08,1)"
                   : "none",
               }}
             >
-              {count > 0 &&
-                eligible.slice(0, Math.min(count, 24)).map((e, i) => (
+              {shownEntries.length > 0 &&
+                shownEntries.map((e, i) => (
                   <span
                     key={e.id}
                     style={{
-                      transform: `rotate(${(i * 360) / Math.min(count, 24)}deg) translateY(-112px)`,
+                      transform: `rotate(${(i * 360) / shownEntries.length}deg) translateY(-112px)`,
                     }}
                   >
                     {e.name.slice(0, 12)}
                   </span>
                 ))}
             </div>
-            {winner && (
+            {shownState?.winner && (
               <div className="winnerCard">
                 <span>🏆 WINNER</span>
-                <h1>{winner}</h1>
-                {audit && (
+                <h1>{shownState.winner}</h1>
+                {shownState.drawId && (
                   <>
-                    <small>Draw ID: {audit.drawId}</small>
-                    <small>{audit.eligibleCount} eligible entries</small>
+                    <small>Draw ID: {shownState.drawId}</small>
+                    <small>{shownCount} eligible entries</small>
                     <a
-                      href={`/api/draws/verify?id=${audit.drawId}`}
+                      href={`/api/draws/verify?id=${shownState.drawId}`}
                       target="_blank"
                     >
                       Verify draw
