@@ -13,9 +13,74 @@ import {
   useRoomContext,
   useTracks,
 } from "@livekit/components-react";
-import { ConnectionState, Track } from "livekit-client";
+import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import "@livekit/components-styles";
 import { createClient } from "@/lib/supabase/client";
+
+export type LiveDrawState = {
+  prizeId: string;
+  prizeTitle: string;
+  week: number | null;
+  entries: string[];
+  eligibleCount: number;
+  rotation: number;
+  drawing: boolean;
+  winner: string | null;
+  drawId: string | null;
+};
+
+function LiveDrawSync({
+  asHost,
+  state,
+  onState,
+}: {
+  asHost: boolean;
+  state?: LiveDrawState;
+  onState?: (state: LiveDrawState) => void;
+}) {
+  const room = useRoomContext();
+  const latest = useRef(state);
+  latest.current = state;
+  const publish = async (value?: LiveDrawState) => {
+    if (!value || room.state !== ConnectionState.Connected) return;
+    await room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify(value)),
+      { reliable: true, topic: "degens-prize-draw" },
+    );
+  };
+  useEffect(() => {
+    if (asHost) void publish(state);
+  }, [asHost, state]);
+  useEffect(() => {
+    if (!asHost) return;
+    const replay = () => void publish(latest.current);
+    room.on(RoomEvent.ParticipantConnected, replay);
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, replay);
+    };
+  }, [asHost, room]);
+  useEffect(() => {
+    if (asHost || !onState) return;
+    const receive = (
+      payload: Uint8Array,
+      _participant: unknown,
+      _kind: unknown,
+      topic?: string,
+    ) => {
+      if (topic !== "degens-prize-draw") return;
+      try {
+        onState(JSON.parse(new TextDecoder().decode(payload)) as LiveDrawState);
+      } catch {
+        // Ignore malformed room data.
+      }
+    };
+    room.on(RoomEvent.DataReceived, receive);
+    return () => {
+      room.off(RoomEvent.DataReceived, receive);
+    };
+  }, [asHost, onState, room]);
+  return null;
+}
 
 function CommissionerMediaControls() {
   const { localParticipant, isScreenShareEnabled } = useLocalParticipant();
@@ -27,8 +92,7 @@ function CommissionerMediaControls() {
     [micLevel, setMicLevel] = useState(0);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState("");
-  const isLive =
-    isCameraEnabled || isMicrophoneEnabled || isScreenShareEnabled;
+  const isLive = isCameraEnabled || isMicrophoneEnabled || isScreenShareEnabled;
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraStream = useRef<MediaStream | null>(null),
     microphoneStream = useRef<MediaStream | null>(null),
@@ -221,7 +285,13 @@ function CommissionerMediaControls() {
           onClick={toggleLive}
         >
           <strong>{isLive ? "■" : "●"}</strong>
-          <small>{busy === "live" ? "Please wait…" : isLive ? "End Live" : "Start Live"}</small>
+          <small>
+            {busy === "live"
+              ? "Please wait…"
+              : isLive
+                ? "End Live"
+                : "Start Live"}
+          </small>
         </button>
         <button
           type="button"
@@ -325,9 +395,13 @@ function ViewerStage() {
 export default function LiveBroadcast({
   asHost,
   meetingCode,
+  drawState,
+  onDrawState,
 }: {
   asHost: boolean;
   meetingCode: string;
+  drawState?: LiveDrawState;
+  onDrawState?: (state: LiveDrawState) => void;
 }) {
   const [cfg, setCfg] = useState<{
       token: string;
@@ -404,6 +478,11 @@ export default function LiveBroadcast({
           }
         >
           <MeetingStatus asHost={asHost} meetingCode={meetingCode} />
+          <LiveDrawSync
+            asHost={asHost}
+            state={drawState}
+            onState={onDrawState}
+          />
           {cfg.role === "host" ? <VideoConference /> : <ViewerStage />}
           {cfg.role === "host" && <CommissionerMediaControls />}
         </LiveKitRoom>
