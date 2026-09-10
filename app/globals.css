@@ -2339,6 +2339,14 @@ p {
   text-align: center;
   font-size: 11px;
 }
+.deletePrizeButton {
+  border-color: #71303a !important;
+  background: #32161c !important;
+  color: #ffadb6 !important;
+}
+.deletePrizeButton:hover {
+  background: #4a1c25 !important;
+}
 @keyframes viewerSpin {
   to {
     transform: rotate(360deg);
