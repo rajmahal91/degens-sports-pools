@@ -1,12 +1,13 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {LiveKitRoom,VideoConference,useConnectionState,useLocalParticipant} from '@livekit/components-react';
+import {LiveKitRoom,VideoConference,useConnectionState,useLocalParticipant,useRoomContext} from '@livekit/components-react';
 import {ConnectionState,Track} from 'livekit-client';
 import '@livekit/components-styles';
 import {createClient} from '@/lib/supabase/client';
 
 function CommissionerMediaControls(){
  const {localParticipant,isScreenShareEnabled}=useLocalParticipant();
+ const room=useRoomContext();
  const connectionState=useConnectionState(),connected=connectionState===ConnectionState.Connected;
  const [isCameraEnabled,setCameraEnabled]=useState(false),[isMicrophoneEnabled,setMicrophoneEnabled]=useState(false),[micLevel,setMicLevel]=useState(0);
  const [busy,setBusy]=useState(''),[error,setError]=useState('');
@@ -32,16 +33,17 @@ function CommissionerMediaControls(){
    if(kind==='screen')await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
   }catch(e){const detail=e instanceof Error?`${e.name}: ${e.message}`:'Unknown device error';setError(`${detail}. Check the camera and microphone permissions beside the browser address.`)}finally{setBusy('')}
  }
+ function leave(){cameraStream.current?.getTracks().forEach(t=>t.stop());microphoneStream.current?.getTracks().forEach(t=>t.stop());room.disconnect()}
  return <>
-  {isCameraEnabled&&<div className="commissionerCameraPreview"><video ref={videoRef} autoPlay playsInline muted/><b>YOUR CAMERA · LIVE</b></div>}
+  {isCameraEnabled&&<div className={`commissionerCameraPreview ${isScreenShareEnabled?'pictureInPicture':''}`}><video ref={videoRef} autoPlay playsInline muted/><b>YOU</b></div>}
+  <div className={`roomConnection ${connected?'connected':''}`}>{connected?'● LIVE ROOM CONNECTED':`● ${connectionState.toUpperCase()}…`}</div>
   <div className="commissionerMediaControls">
-   <div className={`roomConnection ${connected?'connected':''}`}>{connected?'LIVE ROOM CONNECTED':`LIVE ROOM ${connectionState.toUpperCase()}…`}</div>
-   <button type="button" className={isMicrophoneEnabled?'on':''} disabled={!!busy||!connected} onClick={()=>toggle('microphone')}>{isMicrophoneEnabled?'Mute Microphone':'Turn On Microphone'}</button>
-   {isMicrophoneEnabled&&<div className="micLive"><i style={{width:`${Math.max(8,Math.min(100,micLevel))}%`}}/><b>MIC LIVE</b></div>}
-   <button type="button" className={isCameraEnabled?'on':''} disabled={!!busy||!connected} onClick={()=>toggle('camera')}>{isCameraEnabled?'Turn Off Camera':'Turn On Camera'}</button>
-   <button type="button" className={isScreenShareEnabled?'on':''} disabled={!!busy||!connected} onClick={()=>toggle('screen')}>{isScreenShareEnabled?'Stop Sharing':'Share Screen'}</button>
-   {error&&<span>{error}</span>}
+   <button type="button" className={isMicrophoneEnabled?'on':''} disabled={!!busy||!connected} onClick={()=>toggle('microphone')}><strong>{isMicrophoneEnabled?'🎙':'🔇'}</strong><small>{isMicrophoneEnabled?'Mute':'Unmute'}</small>{isMicrophoneEnabled&&<i className="micMeter" style={{width:`${Math.max(8,Math.min(100,micLevel))}%`}}/>}</button>
+   <button type="button" className={isCameraEnabled?'on':''} disabled={!!busy||!connected} onClick={()=>toggle('camera')}><strong>{isCameraEnabled?'📹':'▣'}</strong><small>{isCameraEnabled?'Stop Video':'Start Video'}</small></button>
+   <button type="button" className={isScreenShareEnabled?'on shareOn':''} disabled={!!busy||!connected} onClick={()=>toggle('screen')}><strong>▤</strong><small>{isScreenShareEnabled?'Stop Share':'Share'}</small></button>
+   <button type="button" className="leaveRoom" onClick={leave}><strong>↪</strong><small>Leave</small></button>
   </div>
+  {error&&<div className="mediaNotice">{error}</div>}
  </>
 }
 
@@ -50,5 +52,5 @@ export default function LiveBroadcast({asHost}:{asHost:boolean}){
  useEffect(()=>{let active=true;(async()=>{try{setCfg(null);setError('');setRoomError('');const {data}=await createClient().auth.getSession();const headers=new Headers({'content-type':'application/json'});if(data.session?.access_token)headers.set('authorization',`Bearer ${data.session.access_token}`);const r=await fetch('/api/livekit/token',{method:'POST',headers,body:JSON.stringify({roomName:'degens-live',asHost})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Live broadcast unavailable');if(asHost&&j.role!=='host')throw new Error('Commissioner broadcast permissions were not granted. Please refresh and try again.');if(active)setCfg(j)}catch(e){if(active)setError(e instanceof Error?e.message:'Live broadcast unavailable')}})();return()=>{active=false}},[asHost,attempt]);
  if(error)return <div className="videoPlaceholder"><span>LIVE VIDEO</span><strong>Broadcast not connected</strong><p>{error}</p></div>;
  if(!cfg)return <div className="videoPlaceholder"><strong>Connecting live room…</strong></div>;
- return <div className="livekitWrap" data-lk-theme="default"><LiveKitRoom key={cfg.token} token={cfg.token} serverUrl={cfg.url} connect video={false} audio={false} onConnected={()=>setRoomError('')} onError={e=>setRoomError(`${e.name}: ${e.message}`)} onDisconnected={reason=>setRoomError(`Live room disconnected${reason?`: ${String(reason)}`:''}`)}><VideoConference/>{cfg.role==='host'&&<CommissionerMediaControls/>}</LiveKitRoom>{roomError&&<div className="roomConnectionError"><b>LIVE ROOM NOT CONNECTED</b><span>{roomError}</span><button type="button" onClick={()=>setAttempt(x=>x+1)}>Retry Connection</button></div>}</div>
+ return <div className="liveBroadcastShell"><div className="livekitWrap" data-lk-theme="default"><LiveKitRoom key={cfg.token} token={cfg.token} serverUrl={cfg.url} connect video={false} audio={false} onConnected={()=>setRoomError('')} onError={e=>setRoomError(`${e.name}: ${e.message}`)} onDisconnected={reason=>setRoomError(`Live room disconnected${reason?`: ${String(reason)}`:''}`)}><VideoConference/>{cfg.role==='host'&&<CommissionerMediaControls/>}</LiveKitRoom></div>{roomError&&<div className="roomConnectionError"><div><b>Live room disconnected</b><span>{roomError}</span></div><button type="button" onClick={()=>setAttempt(x=>x+1)}>Reconnect</button></div>}</div>
 }
