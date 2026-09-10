@@ -27,6 +27,8 @@ function CommissionerMediaControls() {
     [micLevel, setMicLevel] = useState(0);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState("");
+  const isLive =
+    isCameraEnabled || isMicrophoneEnabled || isScreenShareEnabled;
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraStream = useRef<MediaStream | null>(null),
     microphoneStream = useRef<MediaStream | null>(null),
@@ -133,6 +135,64 @@ function CommissionerMediaControls() {
       setBusy("");
     }
   }
+  async function toggleLive() {
+    setBusy("live");
+    setError("");
+    try {
+      if (isLive) {
+        const cameraTrack = cameraStream.current?.getVideoTracks()[0];
+        const microphoneTrack = microphoneStream.current?.getAudioTracks()[0];
+        if (cameraTrack)
+          await localParticipant.unpublishTrack(cameraTrack, true);
+        if (microphoneTrack)
+          await localParticipant.unpublishTrack(microphoneTrack, true);
+        if (isScreenShareEnabled)
+          await localParticipant.setScreenShareEnabled(false);
+        cameraStream.current = null;
+        microphoneStream.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        stopMeter();
+        setCameraEnabled(false);
+        setMicrophoneEnabled(false);
+      } else {
+        if (!navigator.mediaDevices?.getUserMedia)
+          throw new Error("Camera and microphone access are not supported.");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+        const cameraTrack = stream.getVideoTracks()[0];
+        const microphoneTrack = stream.getAudioTracks()[0];
+        if (!cameraTrack || !microphoneTrack)
+          throw new Error("A camera and microphone are required to go live.");
+        await localParticipant.publishTrack(cameraTrack, {
+          source: Track.Source.Camera,
+        });
+        await localParticipant.publishTrack(microphoneTrack, {
+          source: Track.Source.Microphone,
+        });
+        cameraStream.current = stream;
+        microphoneStream.current = stream;
+        setCameraEnabled(true);
+        setMicrophoneEnabled(true);
+        startMeter(stream);
+        requestAnimationFrame(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            void videoRef.current.play();
+          }
+        });
+      }
+    } catch (e) {
+      const detail =
+        e instanceof Error ? `${e.name}: ${e.message}` : "Unknown device error";
+      setError(
+        `${detail}. Check the camera and microphone permissions beside the browser address.`,
+      );
+    } finally {
+      setBusy("");
+    }
+  }
   function leave() {
     cameraStream.current?.getTracks().forEach((t) => t.stop());
     microphoneStream.current?.getTracks().forEach((t) => t.stop());
@@ -154,6 +214,15 @@ function CommissionerMediaControls() {
           : `● ${connectionState.toUpperCase()}…`}
       </div>
       <div className="commissionerMediaControls">
+        <button
+          type="button"
+          className={`broadcastToggle ${isLive ? "live" : ""}`}
+          disabled={!!busy || !connected}
+          onClick={toggleLive}
+        >
+          <strong>{isLive ? "■" : "●"}</strong>
+          <small>{busy === "live" ? "Please wait…" : isLive ? "End Live" : "Start Live"}</small>
+        </button>
         <button
           type="button"
           className={isMicrophoneEnabled ? "on" : ""}
