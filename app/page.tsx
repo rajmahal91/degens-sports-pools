@@ -57,6 +57,7 @@ export default function Home() {
   );
   const [games, setGames] = useState(seedWeek1Games);
   const [currentWeek, setCurrentWeek] = useState(1);
+  const [pickWeek, setPickWeek] = useState(1);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(supabaseConfigured);
   const [signedOut, setSignedOut] = useState(false);
@@ -209,7 +210,9 @@ export default function Home() {
         if (mappedGames.length) setGames(mappedGames);
         setSurvivorPicks(mappedSurvivor);
         setPickem(mappedPickem);
-        setCurrentWeek(Number(b.currentWeek) || 1);
+        const openWeek = Number(b.currentWeek) || 1;
+        setCurrentWeek(openWeek);
+        setPickWeek(openWeek);
         setSignedOut(false);
         setConnected(true);
       })
@@ -255,13 +258,14 @@ export default function Home() {
         (!selectedPoolId || e.poolId === selectedPoolId),
     ) || availableSurvivorEntries[0];
   const currentGames = games.filter((g) => g.week === currentWeek);
+  const pickWeekGames = games.filter((g) => g.week === pickWeek);
   const selectedSurvivor = survivorPicks.find(
-    (p) => p.entryId === activeSurvivor?.id && p.week === currentWeek,
+    (p) => p.entryId === activeSurvivor?.id && p.week === pickWeek,
   );
   const survivorChoice = pendingSurvivor || selectedSurvivor;
   const usedSurvivorTeams = new Set(
     survivorPicks
-      .filter((p) => p.entryId === activeSurvivor?.id && p.week < currentWeek)
+      .filter((p) => p.entryId === activeSurvivor?.id && p.week !== pickWeek)
       .map((p) => p.teamCode),
   );
   const fantasyFilled = fantasy.filter((s) => s.player).length;
@@ -283,8 +287,12 @@ export default function Home() {
     entries.find((e) => e.id === activeEntry && pickemPoolIds.has(e.poolId)) ||
     pickemEntries[0];
   const currentGameIds = new Set(currentGames.map((g) => g.id));
-  const pickemCount = pickem.filter(
+  const currentPickemCount = pickem.filter(
     (p) => p.entryId === pickemEntry?.id && currentGameIds.has(p.gameId),
+  ).length;
+  const pickWeekGameIds = new Set(pickWeekGames.map((g) => g.id));
+  const pickemCount = pickem.filter(
+    (p) => p.entryId === pickemEntry?.id && pickWeekGameIds.has(p.gameId),
   ).length;
   const visibleLeaderboard = supabaseConfigured ? [] : leaderboard;
 
@@ -307,7 +315,7 @@ export default function Home() {
     const { gameId, teamCode, teamName } = pendingSurvivor;
     const confirmed: SurvivorPick = {
       entryId,
-      week: currentWeek,
+      week: pickWeek,
       teamCode,
       teamName,
       locked: false,
@@ -317,7 +325,7 @@ export default function Home() {
     if (!connected) {
       setSurvivorPicks((prev) => [
         ...prev.filter(
-          (p) => !(p.entryId === entryId && p.week === currentWeek),
+          (p) => !(p.entryId === entryId && p.week === pickWeek),
         ),
         confirmed,
       ]);
@@ -329,17 +337,17 @@ export default function Home() {
       const r = await fetch("/api/picks/survivor", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ entryId, gameId, week: currentWeek, teamCode }),
+        body: JSON.stringify({ entryId, gameId, week: pickWeek, teamCode }),
       });
       if (r.ok) {
         setSurvivorPicks((prev) => [
           ...prev.filter(
-            (p) => !(p.entryId === entryId && p.week === currentWeek),
+            (p) => !(p.entryId === entryId && p.week === pickWeek),
           ),
           confirmed,
         ]);
         setPendingSurvivor(null);
-        setNotice(`Week ${currentWeek} pick confirmed.`);
+        setNotice(`Week ${pickWeek} pick confirmed.`);
         return;
       }
       const j = await r.json();
@@ -402,10 +410,10 @@ export default function Home() {
     }
   }
   function submitPickem() {
-    if (pickemCount !== currentGames.length) return;
+    if (pickemCount !== pickWeekGames.length) return;
     setPickemSubmitted(true);
     setNotice(
-      `All ${currentGames.length} Week ${currentWeek} Pick’em selections are submitted and saved.`,
+      `All ${pickWeekGames.length} Week ${pickWeek} Pick’em selections are submitted and saved.`,
     );
   }
   function openPayment(pool: Pool, entry?: Entry) {
@@ -495,6 +503,7 @@ export default function Home() {
     const entry = entries.find((e) => e.poolId === pool.id);
     if (entry) setActiveEntry(entry.id);
     setSelectedPoolId(pool.id);
+    setPickWeek(currentWeek);
     setPendingSurvivor(null);
     if (pool.type === "SURVIVOR") setPickMode("survivor");
     if (pool.type === "PICKEM") setPickMode("pickem");
@@ -618,7 +627,7 @@ export default function Home() {
                 </div>
                 <div>
                   <b>
-                    {pickemCount}/{currentGames.length}
+                    {currentPickemCount}/{currentGames.length}
                   </b>
                   <span>Pick’em made</span>
                 </div>
@@ -758,7 +767,7 @@ export default function Home() {
                           className="primary"
                           onClick={() => openPoolPicks(pool)}
                         >
-                          Make Week {currentWeek} Picks
+                          View & Make Picks
                         </button>
                       )}
                       {firstUnpaid && pool.entryFeeCents > 0 && (
@@ -808,15 +817,48 @@ export default function Home() {
             <span className="eyebrow">{activePoolForPicks.sport} POOL</span>
             <h1>{activePoolForPicks.name}</h1>
             <span>
-              {activePoolForPicks.type.replaceAll("_", " ")} · Week {currentWeek}
+              {activePoolForPicks.type.replaceAll("_", " ")} · Week {pickWeek}
             </span>
           </div>
+          {(pickMode === "survivor" || pickMode === "pickem") && (
+            <nav className="weekTabs" aria-label="Choose an NFL week">
+              {Array.from({ length: 18 }, (_, index) => index + 1).map((week) => {
+                const weekGames = games.filter((game) => game.week === week);
+                const survivorSaved = survivorPicks.some(
+                  (pick) => pick.entryId === activeSurvivor?.id && pick.week === week,
+                );
+                const weekGameIds = new Set(weekGames.map((game) => game.id));
+                const pickemSaved = pickem.filter(
+                  (pick) => pick.entryId === pickemEntry?.id && weekGameIds.has(pick.gameId),
+                ).length;
+                const status = pickMode === "survivor"
+                  ? survivorSaved ? "Pick saved" : "Not picked"
+                  : weekGames.length ? `${pickemSaved}/${weekGames.length} saved` : "Schedule pending";
+                return (
+                  <button
+                    type="button"
+                    key={week}
+                    className={`${pickWeek === week ? "weekActive" : ""} ${week === currentWeek ? "weekCurrent" : ""} ${survivorSaved || (weekGames.length > 0 && pickemSaved === weekGames.length) ? "weekComplete" : ""}`}
+                    onClick={() => {
+                      setPickWeek(week);
+                      setPendingSurvivor(null);
+                      setPickemSubmitted(false);
+                      setNotice(null);
+                    }}
+                  >
+                    <strong>Week {week}</strong>
+                    <small>{status}</small>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
           {pickMode === "survivor" && (
             <>
               <div className="sectionHeader">
                 <div>
                   <span className="eyebrow">
-                    NFL SURVIVOR · WEEK {currentWeek}
+                    NFL SURVIVOR · WEEK {pickWeek}
                   </span>
                   <h1>Choose one team</h1>
                 </div>
@@ -841,9 +883,9 @@ export default function Home() {
                   This entry must be paid before a pick can be submitted.
                 </div>
               )}
-              {currentWeek > 1 && (
+              {usedSurvivorTeams.size > 0 && (
                 <div className="ruleBox">
-                  <strong>Previously used teams are unavailable</strong>
+                  <strong>Teams saved in another week are unavailable</strong>
                   <span>
                     {usedSurvivorTeams.size
                       ? [...usedSurvivorTeams].join(" · ")
@@ -851,7 +893,10 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              {currentGames.map((g) => (
+              {pickWeekGames.length === 0 && (
+                <div className="wideCard"><span>The Week {pickWeek} schedule is not available yet.</span></div>
+              )}
+              {pickWeekGames.map((g) => (
                 <div className="gameCard" key={g.id}>
                   <div className="gameTime">{when(g.kickoff)}</div>
                   <div className="matchup">
@@ -921,10 +966,10 @@ export default function Home() {
               <div className="sectionHeader">
                 <div>
                   <span className="eyebrow">
-                    NFL PICK’EM · WEEK {currentWeek}
+                    NFL PICK’EM · WEEK {pickWeek}
                   </span>
                   <h1>
-                    {pickemCount}/{currentGames.length} selections
+                    {pickemCount}/{pickWeekGames.length} selections
                   </h1>
                 </div>
               </div>
@@ -943,7 +988,10 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              {currentGames.map((g) => {
+              {pickWeekGames.length === 0 && (
+                <div className="wideCard"><span>The Week {pickWeek} schedule is not available yet.</span></div>
+              )}
+              {pickWeekGames.map((g) => {
                 const sel = pickem.find(
                   (p) => p.gameId === g.id && p.entryId === pickemEntry?.id,
                 );
@@ -974,19 +1022,19 @@ export default function Home() {
               })}
               {pickemSubmitted && (
                 <div className="notice">
-                  All {currentGames.length} Week {currentWeek} Pick’em
+                  All {pickWeekGames.length} Week {pickWeek} Pick’em
                   selections are submitted and saved.
                 </div>
               )}
               <button
                 className="primary"
                 disabled={
-                  pickemCount !== currentGames.length || pickemSubmitted
+                  pickWeekGames.length === 0 || pickemCount !== pickWeekGames.length || pickemSubmitted
                 }
                 onClick={submitPickem}
               >
                 {pickemSubmitted
-                  ? `Week ${currentWeek} Picks Submitted`
+                  ? `Week ${pickWeek} Picks Submitted`
                   : "Submit All Picks"}
               </button>
             </>
