@@ -4,14 +4,41 @@ import { requireUser } from '@/lib/auth';
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    const [{data:profile},{data:pools},{data:entries},{data:payments},{data:games},{data:athletes}] = await Promise.all([
+    const [
+      {data:profile},
+      {data:entries},
+      {data:payments},
+      {data:games},
+      {data:athletes},
+      {data:leagueMemberships},
+      {data:organizationMemberships},
+      {data:ownedOrganizations},
+    ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id',user.id).single(),
-      supabase.from('pools').select('*').order('created_at'),
       supabase.from('entries').select('*').eq('user_id',user.id).order('created_at'),
       supabase.from('payments').select('*').eq('user_id',user.id).order('submitted_at',{ascending:false}),
       supabase.from('games').select('*').eq('sport','NFL').order('kickoff_at').limit(400),
       supabase.from('athletes').select('id,name,team_code,position,active').eq('sport','NFL').eq('active',true).limit(1200),
+      supabase.from('league_members').select('pool_id').eq('user_id',user.id).eq('status','ACTIVE'),
+      supabase.from('organization_members').select('organization_id,role').eq('user_id',user.id).eq('status','ACTIVE').in('role',['OWNER','ADMIN','COMMISSIONER']),
+      supabase.from('organizations').select('id').eq('owner_user_id',user.id),
     ]);
+    const memberPoolIds=(leagueMemberships||[]).map(m=>m.pool_id);
+    const entryPoolIds=(entries||[]).map(e=>e.pool_id);
+    const visiblePoolIds=[...new Set([...memberPoolIds,...entryPoolIds])];
+    const managedOrganizationIds=[...new Set([
+      ...(organizationMemberships||[]).map(m=>m.organization_id),
+      ...(ownedOrganizations||[]).map(o=>o.id),
+    ])];
+    const [{data:memberPools},{data:managedPools}] = await Promise.all([
+      visiblePoolIds.length
+        ? supabase.from('pools').select('*').in('id',visiblePoolIds).order('created_at')
+        : Promise.resolve({data:[]}),
+      managedOrganizationIds.length
+        ? supabase.from('pools').select('*').in('organization_id',managedOrganizationIds).order('created_at')
+        : Promise.resolve({data:[]}),
+    ]);
+    const pools=[...new Map([...(memberPools||[]),...(managedPools||[])].map(pool=>[pool.id,pool])).values()];
     const poolIds=(pools||[]).map(p=>p.id);
     const {data:rounds}=poolIds.length?await supabase.from('rounds').select('*').in('pool_id',poolIds).order('round_order'):({data:[]} as any);
     const entryIds=(entries||[]).map(e=>e.id);
