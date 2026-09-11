@@ -91,6 +91,11 @@ export default function Home() {
     useState<PaymentMethod>("ETRANSFER");
   const [reference, setReference] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [account, setAccount] = useState<{
+    email: string;
+    displayName: string;
+    username: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -100,6 +105,7 @@ export default function Home() {
           setPools([]);
           setEntries([]);
           setPayments([]);
+          setAccount(null);
           setSignedOut(r.status === 401);
           if (r.status !== 401)
             setNotice(
@@ -108,6 +114,11 @@ export default function Home() {
           return;
         }
         const b = await r.json();
+        setAccount({
+          email: b.user?.email || "",
+          displayName: b.profile?.display_name || "",
+          username: b.profile?.username || "",
+        });
         const mappedPools: Pool[] = (b.pools || []).map((p: any) => ({
           id: p.id,
           name: p.name,
@@ -206,6 +217,7 @@ export default function Home() {
         setPools([]);
         setEntries([]);
         setPayments([]);
+        setAccount(null);
         setNotice(
           "Your pool data could not be loaded. Please refresh the page.",
         );
@@ -506,11 +518,18 @@ export default function Home() {
           </div>
         </a>
         <div className="topActions">
-          {process.env.NEXT_PUBLIC_SUPABASE_URL && (
-            <a className="authLink" href="/auth/login">
-              Account
-            </a>
-          )}
+          {process.env.NEXT_PUBLIC_SUPABASE_URL &&
+            (account ? (
+              <a className="accountIdentity" href="/account" aria-label="Open your account">
+                <span className="signedInDot" aria-hidden="true" />
+                <span>
+                  <small>Signed in as</small>
+                  <strong>{account.username ? `@${account.username}` : account.displayName || account.email}</strong>
+                </span>
+              </a>
+            ) : (
+              <a className="authLink" href="/auth/login">Sign In</a>
+            ))}
           <button
             className="roleToggle"
             onClick={() =>
@@ -582,10 +601,10 @@ export default function Home() {
                   <strong>Prizes</strong>
                   <small>Upcoming draws and winners</small>
                 </a>
-                <a href="/auth/login">
+                <a href={account ? "/account" : "/auth/login"}>
                   <span>○</span>
                   <strong>My Account</strong>
-                  <small>Sign in or manage account</small>
+                  <small>{account ? account.username ? `@${account.username}` : account.email : "Sign in or create account"}</small>
                 </a>
               </>
             )}
