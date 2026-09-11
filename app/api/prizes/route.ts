@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 async function manageablePoolIds(supabase: SupabaseClient, userId: string) {
   const { data: ownedOrgs } = await supabase
@@ -246,7 +245,7 @@ export async function DELETE(req: Request) {
       );
     const { data: prize, error } = await supabase
       .from("prizes")
-      .select("id,pool_id,name")
+      .select("id,pool_id,name,pools(organization_id)")
       .eq("id", prizeId)
       .single();
     if (error || !prize) throw error || new Error("Prize not found.");
@@ -256,25 +255,29 @@ export async function DELETE(req: Request) {
         { error: "Commissioner access required." },
         { status: 403 },
       );
-    const admin = createAdminClient();
-    const { data: draws, error: drawsError } = await admin
+    const { data: draws, error: drawsError } = await supabase
       .from("prize_draws")
       .select("id,winner_name,drawn_at,verification_hash")
       .eq("prize_id", prizeId);
     if (drawsError) throw drawsError;
-    await admin.from("commissioner_audit_log").insert({
-      commissioner_id: user.id,
-      action: "PRIZE_DELETED",
-      entity_type: "prize",
-      entity_id: prizeId,
-      before_state: {
-        id: prize.id,
-        pool_id: prize.pool_id,
-        name: prize.name,
-        completed_draws: draws || [],
-      },
-    });
-    const { data: deleted, error: deleteError } = await admin
+    const organizationId = (prize as any).pools?.organization_id;
+    const { error: auditError } = await supabase
+      .from("commissioner_audit_log")
+      .insert({
+        commissioner_id: user.id,
+        organization_id: organizationId,
+        action: "PRIZE_DELETED",
+        entity_type: "prize",
+        entity_id: prizeId,
+        before_state: {
+          id: prize.id,
+          pool_id: prize.pool_id,
+          name: prize.name,
+          completed_draws: draws || [],
+        },
+      });
+    if (auditError) throw auditError;
+    const { data: deleted, error: deleteError } = await supabase
       .from("prizes")
       .delete()
       .eq("id", prizeId)
