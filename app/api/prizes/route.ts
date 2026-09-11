@@ -274,18 +274,14 @@ export async function DELETE(req: Request) {
         completed_draws: draws || [],
       },
     });
-    if (draws?.length) {
-      const { error: drawDeleteError } = await admin
-        .from("prize_draws")
-        .delete()
-        .eq("prize_id", prizeId);
-      if (drawDeleteError) throw drawDeleteError;
-    }
-    const { error: deleteError } = await admin
+    const { data: deleted, error: deleteError } = await admin
       .from("prizes")
       .delete()
-      .eq("id", prizeId);
+      .eq("id", prizeId)
+      .select("id")
+      .single();
     if (deleteError) throw deleteError;
+    if (!deleted) throw new Error("Prize was not deleted.");
     console.info("[api/prizes] DELETE completed", {
       prizeId,
       poolId: prize.pool_id,
@@ -293,8 +289,25 @@ export async function DELETE(req: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not delete prize.";
-    console.error("[api/prizes] DELETE failed", { message });
+    const detail =
+      e && typeof e === "object"
+        ? (e as {
+            message?: string;
+            details?: string;
+            hint?: string;
+            code?: string;
+          })
+        : null;
+    const message =
+      e instanceof Error
+        ? e.message
+        : detail?.message || detail?.details || "Could not delete prize.";
+    console.error("[api/prizes] DELETE failed", {
+      message,
+      code: detail?.code,
+      details: detail?.details,
+      hint: detail?.hint,
+    });
     return NextResponse.json(
       { error: message },
       { status: message === "UNAUTHENTICATED" ? 401 : 400 },
