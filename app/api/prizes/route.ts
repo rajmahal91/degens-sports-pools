@@ -269,7 +269,7 @@ export async function DELETE(req: Request) {
         action: "PRIZE_DELETED",
         entity_type: "prize",
         entity_id: prizeId,
-        before_state: {
+        payload: {
           id: prize.id,
           pool_id: prize.pool_id,
           name: prize.name,
