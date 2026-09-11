@@ -28,7 +28,7 @@ body {
   max-width: 680px;
   margin: auto;
   min-height: 100vh;
-  padding: 20px 18px 110px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 18px 110px;
 }
 .topbar {
   display: flex;
@@ -67,7 +67,7 @@ body {
   gap: 16px;
 }
 .hero {
-  padding: 24px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
   border: 1px solid var(--line);
   background:
     radial-gradient(circle at top right, #203117 0, transparent 38%),
@@ -1148,7 +1148,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 5vw;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 5vw 16px;
   border-bottom: 1px solid var(--line);
   background: #10151e;
   position: sticky;
@@ -1326,7 +1326,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 24px 18px;
   border-bottom: 1px solid #252a33;
   background: #11141a;
   position: sticky;
@@ -1690,7 +1690,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 24px 18px;
   border-bottom: 1px solid #252a33;
   background: #11141a;
 }
@@ -1826,7 +1826,7 @@ p {
     font-size: 19px;
   }
   .prizeTop {
-    padding: max(10px, env(safe-area-inset-top)) 8px 10px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 8px 10px;
   }
 }
 
@@ -1837,11 +1837,11 @@ p {
   color: #fff;
 }
 .featureTop {
-  height: 72px;
+  min-height: calc(72px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 5vw;
+  padding: env(safe-area-inset-top, 0px) 5vw 0;
   border-bottom: 1px solid #232733;
   background: #0d1017;
 }
@@ -2662,10 +2662,11 @@ a {
 }
 @media (max-width: 600px) {
   .shell {
-    padding: 14px 14px calc(104px + env(safe-area-inset-bottom));
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 14px calc(104px + env(safe-area-inset-bottom, 0px));
   }
   .topbar {
-    align-items: flex-start;
+    align-items: stretch;
+    flex-direction: column;
     gap: 10px;
     margin-bottom: 18px;
   }
@@ -2679,7 +2680,13 @@ a {
     letter-spacing: 0.2em;
   }
   .topActions {
+    width: 100%;
+    justify-content: space-between;
     gap: 5px;
+  }
+  .topActions .accountIdentity {
+    max-width: none;
+    flex: 1;
   }
   .topActions .authLink,
   .topActions .roleToggle {
@@ -2723,7 +2730,7 @@ a {
   }
   .drawTop {
     grid-template-columns: minmax(74px, 1fr) auto minmax(94px, 1fr);
-    padding: max(8px, env(safe-area-inset-top)) 5px 8px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 5px 8px;
   }
   .drawTop > a {
     min-height: 48px;
