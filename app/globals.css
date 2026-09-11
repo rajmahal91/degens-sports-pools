@@ -700,6 +700,31 @@ p {
   background: var(--panel2);
   color: var(--accent);
 }
+.leaderboardPoolTabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+.leaderboardPoolTabs::-webkit-scrollbar {
+  display: none;
+}
+.leaderboardPoolTabs button {
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 850;
+}
+.leaderboardPoolTabs button.selected {
+  border-color: var(--accent);
+  background: #233019;
+  color: var(--text);
+}
 .entryTabs {
   display: flex;
   gap: 8px;
@@ -882,7 +907,7 @@ p {
 }
 .leaderRow {
   display: grid;
-  grid-template-columns: 48px 1fr 26px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -900,6 +925,17 @@ p {
 }
 .leaderRow .alive {
   color: var(--accent);
+}
+.leaderResult {
+  align-items: flex-end;
+  min-width: 70px;
+  text-align: right;
+}
+.leaderResult > b {
+  font-size: 18px;
+}
+.leaderResult .out {
+  color: #ff8492;
 }
 .adminPayment {
   display: flex;
