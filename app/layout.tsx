@@ -7,7 +7,7 @@ export const metadata = {
   description: 'Multi-sport survivor, pick’em, bracket and prize draw platform',
   applicationName: 'Degens Sports Pools',
   manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent' as const, title: 'Degens Pools' },
+  appleWebApp: { capable: true, statusBarStyle: 'black' as const, title: 'Degens Pools' },
   formatDetection: { telephone: false },
 };
 
