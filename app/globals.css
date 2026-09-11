@@ -930,6 +930,75 @@ p {
   text-decoration: none;
   font-weight: 800;
 }
+.fieldHint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.usernameInput {
+  position: relative;
+}
+.usernameInput > span {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  z-index: 1;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-weight: 900;
+}
+.usernameInput .textInput {
+  padding-left: 31px;
+}
+.accountCard .backLink {
+  align-self: flex-start;
+  color: var(--text);
+}
+.accountSummary {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel2);
+}
+.accountSummary > div:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.accountSummary strong,
+.accountSummary span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.accountSummary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.accountAvatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #111;
+  font-size: 18px;
+  font-weight: 950;
+}
+.dangerButton {
+  min-height: 48px;
+  border: 1px solid #7c2d3b;
+  border-radius: 15px;
+  background: #271319;
+  color: #ff9aaa;
+  font-weight: 900;
+}
 .topActions {
   display: flex;
   align-items: center;
@@ -1001,6 +1070,46 @@ p {
   font-size: 12px;
   font-weight: 850;
   text-decoration: none;
+}
+.accountIdentity {
+  max-width: 168px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 10px;
+  text-decoration: none;
+}
+.accountIdentity > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.accountIdentity small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.accountIdentity strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.signedInDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px #b9ff2c1f;
 }
 .leagueForm {
   width: 100%;
