@@ -82,25 +82,30 @@ function LiveDrawSync({
 }
 
 function CommissionerMediaControls() {
-  const { localParticipant, isScreenShareEnabled } = useLocalParticipant();
+  const {
+    localParticipant,
+    isCameraEnabled,
+    isMicrophoneEnabled,
+    isScreenShareEnabled,
+    microphoneTrack,
+  } = useLocalParticipant();
   const room = useRoomContext();
   const connectionState = useConnectionState(),
     connected = connectionState === ConnectionState.Connected;
-  const [isCameraEnabled, setCameraEnabled] = useState(false),
-    [isMicrophoneEnabled, setMicrophoneEnabled] = useState(false),
-    [micLevel, setMicLevel] = useState(0);
+  const [micLevel, setMicLevel] = useState(0);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState("");
   const isLive = isCameraEnabled || isMicrophoneEnabled || isScreenShareEnabled;
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraStream = useRef<MediaStream | null>(null),
-    microphoneStream = useRef<MediaStream | null>(null),
-    meterFrame = useRef<number>(0),
+  const localCamera = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: false }],
+    { onlySubscribed: false },
+  )
+    .filter(isTrackReference)
+    .find((track) => track.participant.identity === localParticipant.identity);
+  const meterFrame = useRef<number>(0),
     audioContext = useRef<AudioContext | null>(null);
   useEffect(
     () => () => {
-      cameraStream.current?.getTracks().forEach((t) => t.stop());
-      microphoneStream.current?.getTracks().forEach((t) => t.stop());
       cancelAnimationFrame(meterFrame.current);
       void audioContext.current?.close();
     },
@@ -114,80 +119,74 @@ function CommissionerMediaControls() {
   }
   function startMeter(stream: MediaStream) {
     stopMeter();
-    const context = new AudioContext();
-    audioContext.current = context;
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 256;
-    context.createMediaStreamSource(stream).connect(analyser);
-    const values = new Uint8Array(analyser.frequencyBinCount);
-    const read = () => {
-      analyser.getByteFrequencyData(values);
-      setMicLevel(values.reduce((a, b) => a + b, 0) / values.length);
-      meterFrame.current = requestAnimationFrame(read);
-    };
-    read();
+    try {
+      const context = new AudioContext();
+      audioContext.current = context;
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      context.createMediaStreamSource(stream).connect(analyser);
+      const values = new Uint8Array(analyser.frequencyBinCount);
+      const read = () => {
+        analyser.getByteFrequencyData(values);
+        setMicLevel(values.reduce((a, b) => a + b, 0) / values.length);
+        meterFrame.current = requestAnimationFrame(read);
+      };
+      read();
+    } catch {
+      // The level meter is optional; iOS may suspend Web Audio while the
+      // microphone track itself remains live and audible to viewers.
+      setMicLevel(0);
+    }
   }
+  useEffect(() => {
+    const mediaTrack = microphoneTrack?.track?.mediaStreamTrack;
+    if (!isMicrophoneEnabled || !mediaTrack) {
+      stopMeter();
+      return;
+    }
+    startMeter(new MediaStream([mediaTrack]));
+    return stopMeter;
+  }, [isMicrophoneEnabled, microphoneTrack]);
   async function toggle(kind: "camera" | "microphone" | "screen") {
     setBusy(kind);
     setError("");
     try {
       if (kind === "camera") {
         if (isCameraEnabled) {
-          const track = cameraStream.current?.getVideoTracks()[0];
-          if (track) await localParticipant.unpublishTrack(track, true);
-          cameraStream.current = null;
-          if (videoRef.current) videoRef.current.srcObject = null;
-          setCameraEnabled(false);
+          await localParticipant.setCameraEnabled(false);
         } else {
           if (!navigator.mediaDevices?.getUserMedia)
             throw new Error("Camera access is not supported in this browser.");
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
+          const publication = await localParticipant.setCameraEnabled(true, {
+            facingMode: "user",
           });
-          const track = stream.getVideoTracks()[0];
-          if (!track) throw new Error("No camera was found.");
-          await localParticipant.publishTrack(track, {
-            source: Track.Source.Camera,
-          });
-          cameraStream.current = stream;
-          setCameraEnabled(true);
-          requestAnimationFrame(() => {
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              void videoRef.current.play();
-            }
-          });
+          if (!publication)
+            throw new Error("The camera could not be started.");
         }
       }
       if (kind === "microphone") {
         if (isMicrophoneEnabled) {
-          const track = microphoneStream.current?.getAudioTracks()[0];
-          if (track) await localParticipant.unpublishTrack(track, true);
-          microphoneStream.current = null;
+          await localParticipant.setMicrophoneEnabled(false);
           stopMeter();
-          setMicrophoneEnabled(false);
         } else {
           if (!navigator.mediaDevices?.getUserMedia)
             throw new Error(
               "Microphone access is not supported in this browser.",
             );
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: false,
-            audio: { echoCancellation: true, noiseSuppression: true },
+          const publication = await localParticipant.setMicrophoneEnabled(true, {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
           });
-          const track = stream.getAudioTracks()[0];
-          if (!track) throw new Error("No microphone was found.");
-          await localParticipant.publishTrack(track, {
-            source: Track.Source.Microphone,
-          });
-          microphoneStream.current = stream;
-          startMeter(stream);
-          setMicrophoneEnabled(true);
+          if (!publication)
+            throw new Error("The microphone could not be started.");
         }
       }
-      if (kind === "screen")
+      if (kind === "screen") {
+        if (!isScreenShareEnabled && !navigator.mediaDevices?.getDisplayMedia)
+          throw new Error("Screen sharing is not supported on this iPhone.");
         await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
+      }
     } catch (e) {
       const detail =
         e instanceof Error ? `${e.name}: ${e.message}` : "Unknown device error";
@@ -203,47 +202,42 @@ function CommissionerMediaControls() {
     setError("");
     try {
       if (isLive) {
-        const cameraTrack = cameraStream.current?.getVideoTracks()[0];
-        const microphoneTrack = microphoneStream.current?.getAudioTracks()[0];
-        if (cameraTrack)
-          await localParticipant.unpublishTrack(cameraTrack, true);
-        if (microphoneTrack)
-          await localParticipant.unpublishTrack(microphoneTrack, true);
+        if (isCameraEnabled)
+          await localParticipant.setCameraEnabled(false);
+        if (isMicrophoneEnabled)
+          await localParticipant.setMicrophoneEnabled(false);
         if (isScreenShareEnabled)
           await localParticipant.setScreenShareEnabled(false);
-        cameraStream.current = null;
-        microphoneStream.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
         stopMeter();
-        setCameraEnabled(false);
-        setMicrophoneEnabled(false);
       } else {
         if (!navigator.mediaDevices?.getUserMedia)
           throw new Error("Camera and microphone access are not supported.");
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: { echoCancellation: true, noiseSuppression: true },
+        const cameraPublication = await localParticipant.setCameraEnabled(true, {
+          facingMode: "user",
         });
-        const cameraTrack = stream.getVideoTracks()[0];
-        const microphoneTrack = stream.getAudioTracks()[0];
-        if (!cameraTrack || !microphoneTrack)
-          throw new Error("A camera and microphone are required to go live.");
-        await localParticipant.publishTrack(cameraTrack, {
-          source: Track.Source.Camera,
-        });
-        await localParticipant.publishTrack(microphoneTrack, {
-          source: Track.Source.Microphone,
-        });
-        cameraStream.current = stream;
-        microphoneStream.current = stream;
-        setCameraEnabled(true);
-        setMicrophoneEnabled(true);
-        startMeter(stream);
-        requestAnimationFrame(() => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            void videoRef.current.play();
-          }
+        if (!cameraPublication)
+          throw new Error("The camera could not be started.");
+        let microphonePublication;
+        try {
+          microphonePublication = await localParticipant.setMicrophoneEnabled(
+            true,
+            {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          );
+        } catch (microphoneError) {
+          await localParticipant.setCameraEnabled(false);
+          throw microphoneError;
+        }
+        if (!microphonePublication) {
+          await localParticipant.setCameraEnabled(false);
+          throw new Error("The microphone could not be started.");
+        }
+        console.info("[live/media] host media enabled", {
+          cameraTrackSid: cameraPublication.trackSid,
+          microphoneTrackSid: microphonePublication.trackSid,
         });
       }
     } catch (e) {
@@ -257,17 +251,23 @@ function CommissionerMediaControls() {
     }
   }
   function leave() {
-    cameraStream.current?.getTracks().forEach((t) => t.stop());
-    microphoneStream.current?.getTracks().forEach((t) => t.stop());
+    void localParticipant.setCameraEnabled(false);
+    void localParticipant.setMicrophoneEnabled(false);
     room.disconnect();
   }
   return (
     <>
-      {isCameraEnabled && (
+      {isCameraEnabled && localCamera && (
         <div
           className={`commissionerCameraPreview ${isScreenShareEnabled ? "pictureInPicture" : ""}`}
         >
-          <video ref={videoRef} autoPlay playsInline muted />
+          <VideoTrack
+            key={localCamera.publication.trackSid}
+            trackRef={localCamera}
+            autoPlay
+            playsInline
+            muted
+          />
           <b>YOU</b>
         </div>
       )}
