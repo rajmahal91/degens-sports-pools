@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 type StandingRow = {
   entryId: string;
@@ -10,6 +9,14 @@ type StandingRow = {
   score: number;
   detail: string;
   alive?: boolean;
+};
+
+type LeaderboardEntry = {
+  entry_id: string;
+  entry_name: string;
+  entry_status: string;
+  score: number | string | null;
+  secondary_value: number | null;
 };
 
 function rankRows(rows: Omit<StandingRow, "rank">[]) {
@@ -38,34 +45,25 @@ export async function GET(request: Request) {
       .single();
     if (poolError || !pool) return NextResponse.json({ error: "Pool not found or access denied." }, { status: 403 });
 
-    const admin = createAdminClient();
-    const { data: entries, error: entriesError } = await admin
-      .from("entries")
-      .select("id,entry_name,entry_status,payment_status")
-      .eq("pool_id", pool.id)
-      .eq("payment_status", "PAID")
-      .order("created_at");
-    if (entriesError) throw entriesError;
+    const { data, error: standingsError } = await supabase.rpc("get_leaderboard_rows", { p_pool_id: pool.id });
+    if (standingsError) {
+      console.error("leaderboard query failed", standingsError);
+      throw new Error(standingsError.message);
+    }
 
-    const entryIds = (entries || []).map((entry) => entry.id);
-    if (!entryIds.length) {
+    const entries = (data || []) as LeaderboardEntry[];
+    if (!entries.length) {
       return NextResponse.json({ pool: { id: pool.id, name: pool.name, type: pool.pool_type }, rows: [] });
     }
 
     let rows: StandingRow[] = [];
     if (pool.pool_type === "SURVIVOR") {
-      const { data: picks, error } = await admin
-        .from("survivor_picks")
-        .select("entry_id,week,result")
-        .in("entry_id", entryIds);
-      if (error) throw error;
-      const prepared = (entries || []).map((entry) => {
-        const mine = (picks || []).filter((pick) => pick.entry_id === entry.id);
-        const wins = mine.filter((pick) => pick.result === "WIN").length;
-        const lossWeek = mine.find((pick) => pick.result === "LOSS")?.week;
+      const prepared = entries.map((entry) => {
+        const wins = Number(entry.score || 0);
+        const lossWeek = entry.secondary_value;
         const alive = entry.entry_status === "ACTIVE";
         return {
-          entryId: entry.id,
+          entryId: entry.entry_id,
           name: entry.entry_name,
           status: alive ? "Alive" : "Eliminated",
           score: wins,
@@ -75,35 +73,23 @@ export async function GET(request: Request) {
       }).sort((a, b) => Number(b.alive) - Number(a.alive) || b.score - a.score || a.name.localeCompare(b.name));
       rows = rankRows(prepared);
     } else if (pool.pool_type === "PICKEM") {
-      const { data: picks, error } = await admin
-        .from("pickem_picks")
-        .select("entry_id,is_correct")
-        .in("entry_id", entryIds);
-      if (error) throw error;
-      const prepared = (entries || []).map((entry) => {
-        const graded = (picks || []).filter((pick) => pick.entry_id === entry.id && pick.is_correct !== null);
-        const correct = graded.filter((pick) => pick.is_correct === true).length;
+      const prepared = entries.map((entry) => {
+        const correct = Number(entry.score || 0);
+        const graded = Number(entry.secondary_value || 0);
         return {
-          entryId: entry.id,
+          entryId: entry.entry_id,
           name: entry.entry_name,
           status: "Active",
           score: correct,
-          detail: `${correct} correct · ${graded.length} graded`,
+          detail: `${correct} correct · ${graded} graded`,
         };
       }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
       rows = rankRows(prepared);
     } else if (pool.pool_type === "PLAYOFF_FANTASY") {
-      const { data: picks, error } = await admin
-        .from("playoff_fantasy_picks")
-        .select("entry_id,fantasy_points")
-        .in("entry_id", entryIds);
-      if (error) throw error;
-      const prepared = (entries || []).map((entry) => {
-        const points = (picks || [])
-          .filter((pick) => pick.entry_id === entry.id)
-          .reduce((sum, pick) => sum + Number(pick.fantasy_points || 0), 0);
+      const prepared = entries.map((entry) => {
+        const points = Number(entry.score || 0);
         return {
-          entryId: entry.id,
+          entryId: entry.entry_id,
           name: entry.entry_name,
           status: "Active",
           score: points,
