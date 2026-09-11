@@ -166,6 +166,112 @@ p {
 .sectionHeader h2 {
   margin: 4px 0;
 }
+.sectionIntro {
+  margin: -7px 0 2px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.poolHubList {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.poolHubCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 17px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.poolHubTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.poolHubTop .grow span,
+.selectedPoolHeader > span:last-child {
+  color: var(--muted);
+}
+.poolHubMeta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.poolHubMeta div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--panel2);
+  border-radius: 12px;
+}
+.poolHubMeta span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.poolHubMeta b {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.poolEntryNames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.poolEntryNames span {
+  padding: 6px 9px;
+  color: #dce4ef;
+  background: #202736;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.poolHubActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.poolHubActions .primary,
+.poolSecondary {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
+.poolSecondary {
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid #354054;
+}
+.poolEmptyState {
+  align-items: stretch;
+  flex-direction: column;
+}
+.poolBackButton {
+  width: fit-content;
+  min-height: 44px;
+  padding: 9px 12px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-weight: 800;
+}
+.selectedPoolHeader {
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.selectedPoolHeader h1 {
+  margin: 5px 0;
+  font-size: 27px;
+}
 .scoreBadge {
   background: var(--accent);
   color: #111;
@@ -316,7 +422,7 @@ p {
   transform: translateX(-50%);
   width: min(calc(100% - 28px), 650px);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: #111722e8;
   backdrop-filter: blur(14px);
   border: 1px solid var(--line);
