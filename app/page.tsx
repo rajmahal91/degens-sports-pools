@@ -49,7 +49,7 @@ const when = (iso: string) =>
 export default function Home() {
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const [tab, setTab] = useState<
-    "home" | "pools" | "picks" | "leaderboard" | "admin"
+    "home" | "pools" | "leaderboard" | "admin"
   >("home");
   const [role, setRole] = useState<UserRole>("PLAYER");
   const [pools, setPools] = useState<Pool[]>(
@@ -76,6 +76,7 @@ export default function Home() {
   const [pickem, setPickem] = useState<PickemSelection[]>([]);
   const [pickemSubmitted, setPickemSubmitted] = useState(false);
   const [activeEntry, setActiveEntry] = useState("entry-r91");
+  const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const [pickMode, setPickMode] = useState<"survivor" | "pickem" | "fantasy">(
     "survivor",
   );
@@ -225,10 +226,22 @@ export default function Home() {
   const mySurvivorEntries = entries.filter((e) =>
     survivorPoolIds.has(e.poolId),
   );
+  const activePoolForPicks = selectedPoolId
+    ? pools.find((pool) => pool.id === selectedPoolId)
+    : undefined;
+  const selectedPoolEntries = selectedPoolId
+    ? entries.filter((entry) => entry.poolId === selectedPoolId)
+    : [];
+  const availableSurvivorEntries = selectedPoolId
+    ? selectedPoolEntries
+    : mySurvivorEntries;
   const activeSurvivor =
     entries.find(
-      (e) => e.id === activeEntry && survivorPoolIds.has(e.poolId),
-    ) || mySurvivorEntries[0];
+      (e) =>
+        e.id === activeEntry &&
+        survivorPoolIds.has(e.poolId) &&
+        (!selectedPoolId || e.poolId === selectedPoolId),
+    ) || availableSurvivorEntries[0];
   const currentGames = games.filter((g) => g.week === currentWeek);
   const selectedSurvivor = survivorPicks.find(
     (p) => p.entryId === activeSurvivor?.id && p.week === currentWeek,
@@ -249,7 +262,11 @@ export default function Home() {
       e.paymentStatus === "UNPAID" &&
       pools.find((p) => p.id === e.poolId)?.entryFeeCents,
   ).length;
-  const pickemEntries = entries.filter((e) => pickemPoolIds.has(e.poolId));
+  const pickemEntries = entries.filter(
+    (e) =>
+      pickemPoolIds.has(e.poolId) &&
+      (!selectedPoolId || e.poolId === selectedPoolId),
+  );
   const pickemEntry =
     entries.find((e) => e.id === activeEntry && pickemPoolIds.has(e.poolId)) ||
     pickemEntries[0];
@@ -462,28 +479,15 @@ export default function Home() {
         ),
       );
   }
-  function addSurvivorEntry() {
-    const n = mySurvivorEntries.length + 1;
-    setEntries((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        poolId: "nfl-survivor",
-        userId: "raj",
-        entryName: `Rouge91 #${n}`,
-        status: "ACTIVE",
-        paymentStatus: "UNPAID",
-      },
-    ]);
-  }
   function openPoolPicks(pool: Pool) {
     const entry = entries.find((e) => e.poolId === pool.id);
     if (entry) setActiveEntry(entry.id);
+    setSelectedPoolId(pool.id);
     setPendingSurvivor(null);
     if (pool.type === "SURVIVOR") setPickMode("survivor");
     if (pool.type === "PICKEM") setPickMode("pickem");
     if (pool.type === "PLAYOFF_FANTASY") setPickMode("fantasy");
-    setTab("picks");
+    setTab("pools");
   }
   function pickFantasy(i: number, player: string) {
     setFantasy((prev) =>
@@ -628,150 +632,165 @@ export default function Home() {
               </div>
             </div>
           )}
-          <h2>{role === "PLAYER" ? "My Pools" : "Pool Overview"}</h2>
+        </section>
+      )}
+
+      {tab === "pools" && !activePoolForPicks && (
+        <section className="stack">
+          <div className="sectionHeader">
+            <div>
+              <span className="eyebrow">YOUR LEAGUES</span>
+              <h1>My Pools</h1>
+            </div>
+            <a className="mini manageLink" href="/join">
+              + Join
+            </a>
+          </div>
+          <p className="sectionIntro">
+            Choose a pool to make picks, manage your entries, or check payment
+            status.
+          </p>
           {loading ? (
             <div className="wideCard">
-              <span>Loading your leagues…</span>
+              <span>Loading your pools…</span>
             </div>
           ) : signedOut ? (
-            <div className="wideCard">
-              <strong>Sign in to view your leagues</strong>
-              <span>
-                Your pools stay private and appear only after you sign in and
-                join with an invitation code.
-              </span>
+            <div className="wideCard poolEmptyState">
+              <strong>Sign in to view your pools</strong>
+              <span>Your leagues and picks are private to your account.</span>
               <a className="primary" href="/auth/login">
                 Sign In or Create Account
               </a>
             </div>
           ) : pools.length === 0 ? (
-            <div className="wideCard">
-              <strong>No leagues yet</strong>
-              <span>
-                Join a league with the invitation code from your commissioner.
-              </span>
+            <div className="wideCard poolEmptyState">
+              <strong>No pools yet</strong>
+              <span>Use the invitation code from your commissioner to join.</span>
               <a className="primary" href="/join">
-                Join a League
+                Join a Pool
               </a>
             </div>
           ) : (
-            <div className="cards">
-              {pools.map((pool) => (
-                <article className="poolCard" key={pool.id}>
-                  <div className="poolIcon">
-                    {pool.sport === "NFL"
-                      ? "🏈"
-                      : pool.sport === "NHL"
-                        ? "🏒"
-                        : "🏀"}
-                  </div>
-                  <div className="grow">
-                    <strong>{pool.name}</strong>
-                    <span>
-                      {pool.season} · {pool.type.replaceAll("_", " ")}
-                    </span>
-                    <span>
-                      {pool.entryFeeCents
-                        ? `${money(pool.entryFeeCents)} entry`
-                        : "Free entry"}
-                    </span>
-                  </div>
-                  {entries.some((e) => e.poolId === pool.id) &&
-                    ["SURVIVOR", "PICKEM", "PLAYOFF_FANTASY"].includes(
-                      pool.type,
-                    ) && (
-                      <button
-                        className="mini"
-                        onClick={() => openPoolPicks(pool)}
-                      >
-                        Make Picks
-                      </button>
+            <div className="poolHubList">
+              {pools.map((pool) => {
+                const poolEntries = entries.filter(
+                  (entry) => entry.poolId === pool.id,
+                );
+                const firstUnpaid = poolEntries.find(
+                  (entry) => entry.paymentStatus === "UNPAID",
+                );
+                const canMakePicks =
+                  poolEntries.length > 0 &&
+                  ["SURVIVOR", "PICKEM", "PLAYOFF_FANTASY"].includes(
+                    pool.type,
+                  );
+                return (
+                  <article className="poolHubCard" key={pool.id}>
+                    <div className="poolHubTop">
+                      <div className="poolIcon" aria-hidden="true">
+                        {pool.sport === "NFL"
+                          ? "🏈"
+                          : pool.sport === "NHL"
+                            ? "🏒"
+                            : "🏀"}
+                      </div>
+                      <div className="grow">
+                        <strong>{pool.name}</strong>
+                        <span>
+                          {pool.season} · {pool.type.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      {poolEntries.length > 0 && (
+                        <span
+                          className={`pill ${poolStatus(pool).toLowerCase()}`}
+                        >
+                          {poolStatus(pool)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="poolHubMeta">
+                      <div>
+                        <span>Entries</span>
+                        <b>{poolEntries.length}</b>
+                      </div>
+                      <div>
+                        <span>Entry fee</span>
+                        <b>
+                          {pool.entryFeeCents
+                            ? money(pool.entryFeeCents)
+                            : "Free"}
+                        </b>
+                      </div>
+                      <div>
+                        <span>Current round</span>
+                        <b>Week {currentWeek}</b>
+                      </div>
+                    </div>
+                    {poolEntries.length > 0 && (
+                      <div className="poolEntryNames">
+                        {poolEntries.map((entry) => (
+                          <span key={entry.id}>{entry.entryName}</span>
+                        ))}
+                      </div>
                     )}
-                  {role === "COMMISSIONER" && (
-                    <a className="mini manageLink" href={`/leagues/${pool.id}`}>
-                      Manage
-                    </a>
-                  )}
-                  <span className={`pill ${poolStatus(pool).toLowerCase()}`}>
-                    {poolStatus(pool)}
-                  </span>
-                </article>
-              ))}
+                    <div className="poolHubActions">
+                      {canMakePicks && (
+                        <button
+                          className="primary"
+                          onClick={() => openPoolPicks(pool)}
+                        >
+                          Make Week {currentWeek} Picks
+                        </button>
+                      )}
+                      {firstUnpaid && pool.entryFeeCents > 0 && (
+                        <button
+                          className="secondary poolSecondary"
+                          onClick={() => openPayment(pool, firstUnpaid)}
+                        >
+                          Pay Entry Fee
+                        </button>
+                      )}
+                      {role === "COMMISSIONER" && (
+                        <a
+                          className="secondary poolSecondary"
+                          href={`/leagues/${pool.id}`}
+                        >
+                          Manage Pool
+                        </a>
+                      )}
+                    </div>
+                    {poolEntries.some(
+                      (entry) => entry.paymentStatus === "PENDING",
+                    ) && (
+                      <div className="pendingNote">
+                        Payment submitted — awaiting commissioner verification.
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
       )}
 
-      {tab === "pools" && (
+      {tab === "pools" && activePoolForPicks && (
         <section className="stack">
-          <div className="sectionHeader">
-            <div>
-              <span className="eyebrow">ENTRIES & PAYMENTS</span>
-              <h1>My Entries</h1>
-            </div>
-            <button className="mini" onClick={addSurvivorEntry}>
-              + Entry
-            </button>
-          </div>
-          {entries.map((e) => {
-            const pool = pools.find((p) => p.id === e.poolId)!;
-            return (
-              <div className="poolPayCard" key={e.id}>
-                <div className="poolPayTop">
-                  <div>
-                    <strong>{e.entryName}</strong>
-                    <span>{pool.name}</span>
-                  </div>
-                  <span className={`pill ${e.paymentStatus.toLowerCase()}`}>
-                    {e.paymentStatus}
-                  </span>
-                </div>
-                <div className="feeRow">
-                  <span>Entry fee</span>
-                  <b>
-                    {pool.entryFeeCents ? money(pool.entryFeeCents) : "FREE"}
-                  </b>
-                </div>
-                {pool.entryFeeCents > 0 && e.paymentStatus === "UNPAID" && (
-                  <button
-                    className="primary"
-                    onClick={() => openPayment(pool, e)}
-                  >
-                    Pay Entry Fee
-                  </button>
-                )}
-                {e.paymentStatus === "PENDING" && (
-                  <div className="pendingNote">
-                    Payment submitted — awaiting commissioner verification.
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </section>
-      )}
-
-      {tab === "picks" && (
-        <section className="stack">
-          <div className="segmented">
-            <button
-              className={pickMode === "survivor" ? "selected" : ""}
-              onClick={() => setPickMode("survivor")}
-            >
-              Survivor
-            </button>
-            <button
-              className={pickMode === "pickem" ? "selected" : ""}
-              onClick={() => setPickMode("pickem")}
-            >
-              Pick’em
-            </button>
-            <button
-              className={pickMode === "fantasy" ? "selected" : ""}
-              onClick={() => setPickMode("fantasy")}
-            >
-              Playoff Fantasy
-            </button>
+          <button
+            className="poolBackButton"
+            onClick={() => {
+              setSelectedPoolId(null);
+              setPendingSurvivor(null);
+            }}
+          >
+            ← All Pools
+          </button>
+          <div className="selectedPoolHeader">
+            <span className="eyebrow">{activePoolForPicks.sport} POOL</span>
+            <h1>{activePoolForPicks.name}</h1>
+            <span>
+              {activePoolForPicks.type.replaceAll("_", " ")} · Week {currentWeek}
+            </span>
           </div>
           {pickMode === "survivor" && (
             <>
@@ -784,7 +803,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="entryTabs">
-                {mySurvivorEntries.map((e) => (
+                {availableSurvivorEntries.map((e) => (
                   <button
                     className={activeSurvivor?.id === e.id ? "entryActive" : ""}
                     key={e.id}
@@ -1202,8 +1221,7 @@ export default function Home() {
         {(
           [
             ["home", "⌂", "Home"],
-            ["pools", "▦", "Entries"],
-            ["picks", "✓", "Picks"],
+            ["pools", "▦", "Pools"],
             ["leaderboard", "≡", "Standings"],
             ["admin", "⚙", "Admin"],
           ] as const
@@ -1211,7 +1229,13 @@ export default function Home() {
           <button
             key={key}
             className={tab === key ? "active" : ""}
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              if (key === "pools") {
+                setSelectedPoolId(null);
+                setPendingSurvivor(null);
+              }
+            }}
           >
             <span>{icon}</span>
             <small>{label}</small>
