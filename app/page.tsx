@@ -495,34 +495,13 @@ export default function Home() {
   return (
     <main className="shell">
       <header className="topbar">
-        <div>
+        <a className="homeBrand" href="/" aria-label="Degens Sports Pools home">
           <div className="brand">DEGENS</div>
           <div className="subbrand">
             SPORTS POOLS {connected ? "· CONNECTED" : "· DEMO"}
           </div>
-        </div>
+        </a>
         <div className="topActions">
-          <a className="authLink" href="/leagues/new">
-            Create League
-          </a>
-          <a className="authLink" href="/join">
-            Join League
-          </a>
-          <a className="authLink" href="/fantasy">
-            Playoff Fantasy
-          </a>
-          <a className="authLink" href="/brackets">
-            Brackets
-          </a>
-          <a className="authLink" href="/prizes">
-            Prizes
-          </a>
-          <a className="authLink" href="/live">
-            Live Draw
-          </a>
-          <a className="authLink" href="/beta">
-            Beta Setup
-          </a>
           {process.env.NEXT_PUBLIC_SUPABASE_URL && (
             <a className="authLink" href="/auth/login">
               Account
@@ -534,7 +513,7 @@ export default function Home() {
               setRole(role === "PLAYER" ? "COMMISSIONER" : "PLAYER")
             }
           >
-            {role === "PLAYER" ? "Player View" : "Commissioner"}
+            {role === "PLAYER" ? "Commissioner" : "Player View"}
           </button>
         </div>
       </header>
@@ -558,6 +537,55 @@ export default function Home() {
                 : "Survivor, Pick’em, playoff fantasy, brackets and live draws."}
             </p>
           </div>
+          <nav className="homeQuickActions" aria-label="Quick actions">
+            {role === "COMMISSIONER" ? (
+              <>
+                <a href="/leagues/new">
+                  <span>＋</span>
+                  <strong>Create League</strong>
+                  <small>Start a new pool</small>
+                </a>
+                <a href="/prizes">
+                  <span>◇</span>
+                  <strong>Prize Centre</strong>
+                  <small>Manage prizes and draws</small>
+                </a>
+                <a href="/live?host=1">
+                  <span>●</span>
+                  <strong>Go Live</strong>
+                  <small>Broadcast a prize draw</small>
+                </a>
+                <a href="/join">
+                  <span>→</span>
+                  <strong>Join League</strong>
+                  <small>Enter an invitation code</small>
+                </a>
+              </>
+            ) : (
+              <>
+                <a href="/join">
+                  <span>＋</span>
+                  <strong>Join League</strong>
+                  <small>Enter your invitation code</small>
+                </a>
+                <a href="/live?viewer=1">
+                  <span>●</span>
+                  <strong>Watch Live Draw</strong>
+                  <small>Enter a meeting code</small>
+                </a>
+                <a href="/prizes">
+                  <span>◇</span>
+                  <strong>Prizes</strong>
+                  <small>Upcoming draws and winners</small>
+                </a>
+                <a href="/auth/login">
+                  <span>○</span>
+                  <strong>My Account</strong>
+                  <small>Sign in or manage account</small>
+                </a>
+              </>
+            )}
+          </nav>
           {role === "PLAYER" ? (
             <>
               <div className="statsGrid">
