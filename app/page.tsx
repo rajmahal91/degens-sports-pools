@@ -46,6 +46,17 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
+type LeaderboardType = "SURVIVOR" | "PICKEM" | "PLAYOFF_FANTASY";
+type LeaderboardRow = {
+  entryId: string;
+  name: string;
+  rank: number;
+  status: string;
+  score: number;
+  detail: string;
+  alive?: boolean;
+};
+
 export default function Home() {
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const [tab, setTab] = useState<
@@ -92,6 +103,11 @@ export default function Home() {
     useState<PaymentMethod>("ETRANSFER");
   const [reference, setReference] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [leaderboardType, setLeaderboardType] = useState<LeaderboardType>("SURVIVOR");
+  const [leaderboardPoolId, setLeaderboardPoolId] = useState("");
+  const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState("");
   const [account, setAccount] = useState<{
     email: string;
     displayName: string;
@@ -228,6 +244,41 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, [supabaseConfigured]);
 
+  useEffect(() => {
+    if (tab !== "leaderboard" || !supabaseConfigured) return;
+    const matchingPools = pools.filter((pool) => pool.type === leaderboardType);
+    const selected = matchingPools.find((pool) => pool.id === leaderboardPoolId) || matchingPools[0];
+    if (!selected) {
+      setLeaderboardPoolId("");
+      setLeaderboardRows([]);
+      setLeaderboardError("");
+      return;
+    }
+    if (leaderboardPoolId !== selected.id) {
+      setLeaderboardPoolId(selected.id);
+      return;
+    }
+
+    const controller = new AbortController();
+    setLeaderboardLoading(true);
+    setLeaderboardError("");
+    fetch(`/api/leaderboard?poolId=${encodeURIComponent(selected.id)}`, { signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Could not load standings.");
+        setLeaderboardRows(body.rows || []);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLeaderboardRows([]);
+        setLeaderboardError(error instanceof Error ? error.message : "Could not load standings.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLeaderboardLoading(false);
+      });
+    return () => controller.abort();
+  }, [tab, supabaseConfigured, pools, leaderboardType, leaderboardPoolId]);
+
   const survivorPoolIds = new Set(
     pools
       .filter((p) => p.type === "SURVIVOR" && p.sport === "NFL")
@@ -294,7 +345,18 @@ export default function Home() {
   const pickemCount = pickem.filter(
     (p) => p.entryId === pickemEntry?.id && pickWeekGameIds.has(p.gameId),
   ).length;
-  const visibleLeaderboard = supabaseConfigured ? [] : leaderboard;
+  const leaderboardPools = pools.filter((pool) => pool.type === leaderboardType);
+  const visibleLeaderboard: LeaderboardRow[] = supabaseConfigured
+    ? leaderboardRows
+    : leaderboard.map((row) => ({
+        entryId: row.name,
+        name: row.name,
+        rank: row.rank,
+        status: row.alive ? "Alive" : "Eliminated",
+        score: 0,
+        detail: row.alive ? "Alive" : "Eliminated",
+        alive: row.alive,
+      }));
 
   function poolStatus(pool: Pool) {
     const mine = entries.filter((e) => e.poolId === pool.id);
@@ -1092,24 +1154,67 @@ export default function Home() {
             <h1>Leaderboards</h1>
           </div>
           <div className="segmented">
-            <button className="selected">Survivor</button>
-            <button>Pick’em</button>
-            <button>Fantasy</button>
+            {([
+              ["SURVIVOR", "Survivor"],
+              ["PICKEM", "Pick’em"],
+              ["PLAYOFF_FANTASY", "Fantasy"],
+            ] as const).map(([type, label]) => (
+              <button
+                type="button"
+                key={type}
+                className={leaderboardType === type ? "selected" : ""}
+                onClick={() => {
+                  setLeaderboardType(type);
+                  setLeaderboardPoolId("");
+                  setLeaderboardRows([]);
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          {visibleLeaderboard.length ? (
+          {leaderboardPools.length > 0 && (
+            <div className="leaderboardPoolTabs" aria-label="Choose a pool">
+              {leaderboardPools.map((pool) => (
+                <button
+                  type="button"
+                  key={pool.id}
+                  className={leaderboardPoolId === pool.id ? "selected" : ""}
+                  onClick={() => {
+                    setLeaderboardPoolId(pool.id);
+                    setLeaderboardRows([]);
+                  }}
+                >
+                  {pool.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {leaderboardLoading ? (
+            <div className="wideCard"><span>Loading standings…</span></div>
+          ) : leaderboardError ? (
+            <div className="warning">{leaderboardError}</div>
+          ) : leaderboardPools.length === 0 && supabaseConfigured ? (
+            <div className="wideCard">
+              <span>You do not have a {leaderboardType === "PLAYOFF_FANTASY" ? "Fantasy" : leaderboardType === "PICKEM" ? "Pick’em" : "Survivor"} pool yet.</span>
+            </div>
+          ) : visibleLeaderboard.length ? (
             visibleLeaderboard.map((row) => (
-              <div className="leaderRow" key={row.name}>
+              <div className="leaderRow" key={row.entryId}>
                 <b>#{row.rank}</b>
                 <div>
                   <strong>{row.name}</strong>
-                  <span>{row.alive ? "Alive" : "Eliminated"}</span>
+                  <span>{row.detail}</span>
                 </div>
-                <span className="alive">●</span>
+                <div className="leaderResult">
+                  <b>{row.score}</b>
+                  <span className={row.alive === false ? "out" : "alive"}>{row.status}</span>
+                </div>
               </div>
             ))
           ) : (
             <div className="wideCard">
-              <span>Select one of your leagues to view its standings.</span>
+              <span>No paid entries are ranked in this pool yet.</span>
             </div>
           )}
         </section>
