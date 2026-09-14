@@ -1,25 +1,21 @@
-import { Entry, NFLGame, PaymentRecord, Pool, SurvivorPick } from './types';
+import { Entry, NFLGame, Pool, SurvivorPick } from './types';
 
 export const pools: Pool[] = [
-  { id: 'nfl-survivor', name: 'NFL Degens Survivor', sport: 'NFL', type: 'SURVIVOR', status: 'ACTIVE', season: '2026', entryFeeCents: 10000, registrationClosesAt: '2026-09-07T23:59:00-07:00' },
-  { id: 'nfl-pickem', name: 'NFL Degens Pick’em', sport: 'NFL', type: 'PICKEM', status: 'ACTIVE', season: '2026', entryFeeCents: 0 },
-  { id: 'nfl-playoff-fantasy', name: 'NFL Playoff Fantasy', sport: 'NFL', type: 'PLAYOFF_FANTASY', status: 'OPEN', season: '2026-27', entryFeeCents: 5000 },
-  { id: 'nhl-bracket', name: 'NHL Playoff Bracket', sport: 'NHL', type: 'BRACKET', status: 'OPEN', season: '2026-27', entryFeeCents: 5000 },
-  { id: 'nba-bracket', name: 'NBA Playoff Bracket', sport: 'NBA', type: 'BRACKET', status: 'OPEN', season: '2026-27', entryFeeCents: 5000 },
+  { id: 'nfl-survivor', name: 'NFL Degens Survivor', sport: 'NFL', type: 'SURVIVOR', status: 'ACTIVE', season: '2026', registrationClosesAt: '2026-09-07T23:59:00-07:00' },
+  { id: 'nfl-pickem', name: 'NFL Degens Pick’em', sport: 'NFL', type: 'PICKEM', status: 'ACTIVE', season: '2026' },
+  { id: 'nfl-playoff-fantasy', name: 'NFL Playoff Fantasy', sport: 'NFL', type: 'PLAYOFF_FANTASY', status: 'OPEN', season: '2026-27' },
+  { id: 'nhl-bracket', name: 'NHL Playoff Bracket', sport: 'NHL', type: 'BRACKET', status: 'OPEN', season: '2026-27' },
+  { id: 'nba-bracket', name: 'NBA Playoff Bracket', sport: 'NBA', type: 'BRACKET', status: 'OPEN', season: '2026-27' },
 ];
 
 export const entries: Entry[] = [
-  { id: 'entry-r91', poolId: 'nfl-survivor', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE', paymentStatus: 'PAID', rank: 18 },
-  { id: 'entry-r91-2', poolId: 'nfl-survivor', userId: 'raj', entryName: 'Rouge91 #2', status: 'ACTIVE', paymentStatus: 'PAID', rank: 44 },
-  { id: 'entry-pickem', poolId: 'nfl-pickem', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE', paymentStatus: 'PAID', rank: 7, score: 0 },
-  { id: 'entry-fantasy', poolId: 'nfl-playoff-fantasy', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE', paymentStatus: 'UNPAID' },
-  { id: 'entry-nhl', poolId: 'nhl-bracket', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE', paymentStatus: 'UNPAID' },
+  { id: 'entry-r91', poolId: 'nfl-survivor', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE', rank: 18 },
+  { id: 'entry-r91-2', poolId: 'nfl-survivor', userId: 'raj', entryName: 'Rouge91 #2', status: 'ACTIVE', rank: 44 },
+  { id: 'entry-pickem', poolId: 'nfl-pickem', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE', rank: 7, score: 0 },
+  { id: 'entry-fantasy', poolId: 'nfl-playoff-fantasy', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE' },
+  { id: 'entry-nhl', poolId: 'nhl-bracket', userId: 'raj', entryName: 'Rouge91', status: 'ACTIVE' },
 ];
 
-export const demoPayments: PaymentRecord[] = [
-  { id: 'pay-1', poolId: 'nfl-survivor', poolName: 'NFL Degens Survivor', entryId: 'entry-r91', entryName: 'Rouge91', amountCents: 10000, method: 'ETRANSFER', status: 'PAID', reference: 'AUTO-2026', createdAt: '2026-09-07T18:30:00-07:00' },
-  { id: 'pay-2', poolId: 'nfl-survivor', poolName: 'NFL Degens Survivor', entryId: 'entry-r91-2', entryName: 'Rouge91 #2', amountCents: 10000, method: 'ETRANSFER', status: 'PAID', reference: 'AUTO-2026-B', createdAt: '2026-09-07T18:31:00-07:00' },
-];
 
 export const nflTeams = [
   ['ARI','Arizona Cardinals'],['ATL','Atlanta Falcons'],['BAL','Baltimore Ravens'],['BUF','Buffalo Bills'],['CAR','Carolina Panthers'],['CHI','Chicago Bears'],['CIN','Cincinnati Bengals'],['CLE','Cleveland Browns'],
