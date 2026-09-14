@@ -28,8 +28,10 @@ export async function POST(req:Request){
   // A unique identity prevents a viewer preview tab from replacing the
   // commissioner's publishing session (LiveKit identities are room-unique).
   const identity=`${user.id}:${asHost?'host':'viewer'}:${randomUUID()}`;
-  const token=new AccessToken(key,secret,{identity,name:user.email||'Degens Player',ttl:'2h'});
-  token.addGrant({roomJoin:true,room:roomName,canPublish:asHost,canSubscribe:true,canPublishData:asHost,canPublishSources:asHost?[TrackSource.CAMERA,TrackSource.MICROPHONE,TrackSource.SCREEN_SHARE,TrackSource.SCREEN_SHARE_AUDIO]:[]});
+  const {data:profile}=await auth.supabase.from('profiles').select('display_name,username').eq('id',user.id).maybeSingle();
+  const participantName=profile?.display_name||profile?.username||user.email?.split('@')[0]||'Degens Player';
+  const token=new AccessToken(key,secret,{identity,name:participantName,ttl:'2h',metadata:JSON.stringify({role:asHost?'host':'viewer'})});
+  token.addGrant({roomJoin:true,room:roomName,canPublish:asHost,canSubscribe:true,canPublishData:true,canPublishSources:asHost?[TrackSource.CAMERA,TrackSource.MICROPHONE,TrackSource.SCREEN_SHARE,TrackSource.SCREEN_SHARE_AUDIO]:[]});
   console.info('[api/livekit/token] issued',{userId:user.id,roomName,role:asHost?'host':'viewer',canPublish:asHost});
   return NextResponse.json({token:await token.toJwt(),url,roomName,role:asHost?'host':'viewer'});
  }catch(e){console.error('[api/livekit/token] failed',{error:e instanceof Error?e.message:String(e)});return NextResponse.json({error:e instanceof Error?e.message:'Unable to create token'},{status:401})}
