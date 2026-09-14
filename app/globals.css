@@ -3093,6 +3093,19 @@ a {
   text-align: right;
 }
 @media (max-width: 800px) {
+  .drawPage {
+    overflow-x: hidden;
+  }
+  .drawLayout {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+  }
+  .broadcast {
+    width: 100%;
+    min-width: 0;
+  }
   .commissionerMediaControls button {
     width: 20%;
   }
@@ -3100,13 +3113,29 @@ a {
     width: 20%;
   }
   .livekitWrap {
-    height: 800px;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .livekitWrap > .lk-room-container {
+    height: auto;
+    min-height: 0;
   }
   .liveRoomGrid {
-    grid-template-columns: 1fr;
-    grid-template-rows: 450px 350px;
+    display: flex;
+    height: auto;
+    flex-direction: column;
+  }
+  .liveVideoPane {
+    width: 100%;
+    height: min(64svh, 480px);
+    min-height: 370px;
+    flex: none;
   }
   .liveChatPanel {
+    width: 100%;
+    height: 390px;
+    flex: none;
     border-left: 0;
     border-top: 1px solid #292d35;
   }
@@ -3119,5 +3148,38 @@ a {
   }
   .liveChatComposer {
     padding-bottom: max(11px, env(safe-area-inset-bottom));
+  }
+  .meetingStatus {
+    max-width: calc(100% - 16px);
+    overflow: hidden;
+  }
+  .meetingStatus > span:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .liveMeta {
+    flex-direction: column;
+  }
+  .liveMeta span {
+    text-align: left;
+  }
+}
+@media (max-width: 390px) {
+  .liveVideoPane {
+    height: 430px;
+    min-height: 430px;
+  }
+  .commissionerMediaControls {
+    padding-inline: 3px;
+  }
+  .commissionerMediaControls button strong {
+    font-size: 18px;
+  }
+  .commissionerMediaControls button small {
+    font-size: 9px;
+  }
+  .meetingStatus {
+    gap: 5px;
+    padding-inline: 7px;
   }
 }
