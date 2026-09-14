@@ -57,9 +57,8 @@ export async function GET() {
     for (const prize of prizes || []) {
       let q = supabase
         .from("entries")
-        .select("id,entry_name,user_id,entry_status,payment_status")
-        .eq("pool_id", prize.pool_id)
-        .eq("payment_status", prize.eligibility?.payment_status || "PAID");
+        .select("id,entry_name,user_id,entry_status")
+        .eq("pool_id", prize.pool_id);
       if (prize.eligibility?.entry_status)
         q = q.eq("entry_status", prize.eligibility.entry_status);
       const { data: raw } = await q;
@@ -132,7 +131,6 @@ export async function POST(req: Request) {
       );
     const eligibility: any = {
       week,
-      payment_status: "PAID",
       one_prize_per_entry: body.onePrizePerEntry !== false,
     };
     if (body.activeOnly !== false) eligibility.entry_status = "ACTIVE";
