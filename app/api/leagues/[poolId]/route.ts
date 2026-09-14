@@ -31,7 +31,6 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       supabase.from('entries').select('*').eq('pool_id',poolId).order('created_at'),
     ]);
     const entryIds=(entries||[]).map(entry=>entry.id);
-    const {data:payments}=entryIds.length?await supabase.from('payments').select('*').in('entry_id',entryIds).order('submitted_at',{ascending:false}):{data:[]};
     let picks:any[]=[];
     if(entryIds.length){
       const table=pool.pool_type==='SURVIVOR'?'survivor_picks':pool.pool_type==='PICKEM'?'pickem_picks':pool.pool_type==='PLAYOFF_FANTASY'?'playoff_fantasy_picks':'bracket_picks';
@@ -48,7 +47,7 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       return {entry_id:entry.id,entry_name:entry.entry_name,entry_status:entry.entry_status,wins,losses,pending,submitted:entryPicks.length};
     }).sort((a,b)=>Number(b.entry_status==='ACTIVE')-Number(a.entry_status==='ACTIVE')||b.wins-a.wins||a.losses-b.losses||a.entry_name.localeCompare(b.entry_name));
     const visiblePicks=picks.map(pick=>{const game=gameById.get(pick.game_id);return {...pick,week:pick.week??game?.week,locked:!!game&&(game.status!=='SCHEDULED'||new Date(game.kickoff_at).getTime()<=Date.now())};});
-    return NextResponse.json({pool,members:members||[],entries:entries||[],payments:payments||[],picks:visiblePicks,games:games||[],standings});
+    return NextResponse.json({pool,members:members||[],entries:entries||[],picks:visiblePicks,games:games||[],standings});
   }catch(error){return failure(error);}
 }
 
@@ -56,12 +55,11 @@ export async function PATCH(request:Request,{params}:{params:Promise<{poolId:str
   try{
     const {poolId}=await params;const {supabase}=await managerContext(poolId);const body=await request.json();
     const name=String(body.name||'').trim().slice(0,80);
-    const entryFeeCents=Math.max(0,Math.round(Number(body.entryFee||0)*100));
     const maxEntries=Math.min(100,Math.max(1,Number(body.maxEntries||1)));
     const maxParticipants=Math.min(1000,Math.max(1,Number(body.maxParticipants||1000)));
     if(name.length<2) return NextResponse.json({error:'Enter a league name.'},{status:400});
     const scoringSettings={deadline_mode:body.deadlineMode==='SUNDAY_10AM_PT'?'SUNDAY_10AM_PT':'GAME_KICKOFF',missed_pick_elimination:body.strictMissedPicks!==false};
-    const {data,error}=await supabase.from('pools').update({name,entry_fee_cents:entryFeeCents,max_entries_per_user:maxEntries,max_participants:maxParticipants,scoring_settings:scoringSettings,visibility:body.visibility==='PUBLIC'?'PUBLIC':'INVITE_ONLY'}).eq('id',poolId).select('*').single();
+    const {data,error}=await supabase.from('pools').update({name,entry_fee_cents:0,max_entries_per_user:maxEntries,max_participants:maxParticipants,scoring_settings:scoringSettings,visibility:body.visibility==='PUBLIC'?'PUBLIC':'INVITE_ONLY'}).eq('id',poolId).select('*').single();
     if(error) throw error;return NextResponse.json({pool:data});
   }catch(error){return failure(error);}
 }
@@ -79,15 +77,6 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
     if(body.action==='deactivate_entry'){
       const {error}=await supabase.from('entries').update({entry_status:'INACTIVE'}).eq('id',String(body.entryId)).eq('pool_id',poolId);
       if(error) throw error;return NextResponse.json({success:true});
-    }
-    if(body.action==='verify_payment'){
-      const paymentId=String(body.paymentId);const {data:before}=await supabase.from('payments').select('entry_id').eq('id',paymentId).maybeSingle();
-      if(!before?.entry_id) return NextResponse.json({error:'Payment not found.'},{status:404});
-      const {data:entry}=await supabase.from('entries').select('id').eq('id',before.entry_id).eq('pool_id',poolId).maybeSingle();
-      if(!entry) return NextResponse.json({error:'Payment does not belong to this league.'},{status:403});
-      const {error}=await supabase.from('payments').update({status:'PAID',verified_by:user.id,verified_at:new Date().toISOString()}).eq('id',paymentId);
-      if(error) throw error;await supabase.from('entries').update({payment_status:'PAID'}).eq('id',entry.id).eq('pool_id',poolId);
-      return NextResponse.json({success:true});
     }
     if(body.action==='run_scoring'){
       const week=Math.max(1,Math.min(22,Number(body.week)||1));
