@@ -7,7 +7,6 @@ export async function GET() {
     const [
       {data:profile},
       {data:entries},
-      {data:payments},
       {data:games},
       {data:athletes},
       {data:leagueMemberships},
@@ -16,7 +15,6 @@ export async function GET() {
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id',user.id).single(),
       supabase.from('entries').select('*').eq('user_id',user.id).order('created_at'),
-      supabase.from('payments').select('*').eq('user_id',user.id).order('submitted_at',{ascending:false}),
       supabase.from('games').select('*').eq('sport','NFL').order('kickoff_at').limit(400),
       supabase.from('athletes').select('id,name,team_code,position,active').eq('sport','NFL').eq('active',true).limit(1200),
       supabase.from('league_members').select('pool_id').eq('user_id',user.id).eq('status','ACTIVE'),
@@ -57,7 +55,7 @@ export async function GET() {
       currentWeek=week;
       if(!complete) break;
     }
-    return NextResponse.json({ user:{id:user.id,email:user.email}, profile, pools:pools||[], entries:entries||[], payments:payments||[], games:nflGames, rounds:rounds||[], survivor:survivor||[], pickem:pickem||[], fantasy:fantasy||[], athletes:athletes||[], currentWeek });
+    return NextResponse.json({ user:{id:user.id,email:user.email}, profile, pools:pools||[], entries:entries||[], games:nflGames, rounds:rounds||[], survivor:survivor||[], pickem:pickem||[], fantasy:fantasy||[], athletes:athletes||[], currentWeek });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unauthenticated' }, { status: 401 });
   }
