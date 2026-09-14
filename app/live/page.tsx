@@ -318,7 +318,7 @@ export default function LiveDraw() {
                 </div>
               )}
               <div className="eligibleTitle">
-                <b>Eligible paid entries</b>
+                <b>Eligible entries</b>
                 <span>{count}</span>
               </div>
               <div className="chips">
