@@ -73,7 +73,7 @@ export async function gradeNFLWeek(season:number,week:number,now=new Date(),clie
   const {data:pools,error:poolsError}=await poolsQuery;
   if(poolsError)throw poolsError;
   for(const pool of pools||[]){
-    const {data:entries,error:entriesError}=await admin.from('entries').select('id,entry_status,payment_status').eq('pool_id',pool.id);
+    const {data:entries,error:entriesError}=await admin.from('entries').select('id,entry_status').eq('pool_id',pool.id);
     if(entriesError)throw entriesError;
     const entryIds=(entries||[]).map((entry:any)=>entry.id);
     if(!entryIds.length)continue;
@@ -95,7 +95,7 @@ export async function gradeNFLWeek(season:number,week:number,now=new Date(),clie
     const deadline=deadlineForWeek(weekGames,settings.deadline_mode||'GAME_KICKOFF');
     if(settings.missed_pick_elimination!==false&&deadline&&now>=deadline){
       const picked=new Set((picks||[]).map((pick:any)=>pick.entry_id));
-      const missing=(entries||[]).filter((entry:any)=>entry.entry_status==='ACTIVE'&&entry.payment_status==='PAID'&&!picked.has(entry.id));
+      const missing=(entries||[]).filter((entry:any)=>entry.entry_status==='ACTIVE'&&!picked.has(entry.id));
       for(const entry of missing){
         const {error}=await admin.from('entries').update({entry_status:'ELIMINATED'}).eq('id',entry.id).eq('pool_id',pool.id).eq('entry_status','ACTIVE');
         if(error)throw error; missed++; eliminated++;
