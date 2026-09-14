@@ -206,7 +206,7 @@ export default function Prizes() {
           <span>WEEKS 1–18 · VERIFIED DRAWS</span>
           <h1>Prizes & Draws</h1>
           <p>
-            Paid, active entries are calculated directly from each league. Every
+            Active entries are calculated directly from each league. Every
             draw saves its eligible list, winner, timestamp and verification
             record.
           </p>
