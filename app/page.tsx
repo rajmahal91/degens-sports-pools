@@ -601,31 +601,26 @@ export default function Home() {
             ) : (
               <a className="authLink" href="/auth/login">Sign In</a>
             ))}
+          <div className="viewSwitcher" role="group" aria-label="Dashboard view">
+            <button
+              type="button"
+              className={role === "PLAYER" ? "active player" : ""}
+              aria-pressed={role === "PLAYER"}
+              onClick={() => setRole("PLAYER")}
+            >
+              Player
+            </button>
+            <button
+              type="button"
+              className={role === "COMMISSIONER" ? "active commissioner" : ""}
+              aria-pressed={role === "COMMISSIONER"}
+              onClick={() => setRole("COMMISSIONER")}
+            >
+              Commissioner
+            </button>
+          </div>
         </div>
       </header>
-
-      <section className={`viewModeBar ${role === "COMMISSIONER" ? "commissioner" : "player"}`} aria-label="Current account view">
-        <span className="viewModeIcon" aria-hidden="true">
-          {role === "COMMISSIONER" ? "C" : "P"}
-        </span>
-        <div>
-          <small>CURRENT VIEW</small>
-          <strong>{role === "COMMISSIONER" ? "Commissioner View" : "Player View"}</strong>
-          <span>
-            {role === "COMMISSIONER"
-              ? "Manage leagues, payments, scoring and prize draws."
-              : "Make picks and view your leagues, standings and prizes."}
-          </span>
-        </div>
-        <button
-          type="button"
-          className="roleToggle"
-          aria-label={`Switch to ${role === "PLAYER" ? "Commissioner" : "Player"} View`}
-          onClick={() => setRole(role === "PLAYER" ? "COMMISSIONER" : "PLAYER")}
-        >
-          Switch to {role === "PLAYER" ? "Commissioner" : "Player"}
-        </button>
-      </section>
 
       {tab === "home" && (
         <section className="stack">
