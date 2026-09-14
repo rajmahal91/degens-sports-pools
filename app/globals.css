@@ -2879,11 +2879,245 @@ a {
   font-size: 11px;
   color: #8f98a6;
 }
+.drawLayout {
+  max-width: 1440px;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 0.7fr);
+}
+.livekitWrap {
+  height: 600px;
+}
+.liveRoomGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.liveVideoPane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #050505;
+}
+.liveVideoPane .lk-video-conference {
+  height: 100%;
+}
+.liveChatPanel {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #111318;
+  border-left: 1px solid #292d35;
+  color: #f5f6f8;
+}
+.liveChatHeader {
+  min-height: 66px;
+  padding: 14px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #292d35;
+}
+.liveChatHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.liveChatHeader strong {
+  font-size: 15px;
+}
+.liveChatHeader span {
+  color: #8d96a5;
+  font-size: 11px;
+}
+.liveChatHeader button {
+  min-height: 36px;
+  border: 1px solid #3a414d;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #1b2028;
+  color: #d9dee7;
+  font-size: 11px;
+  font-weight: 800;
+}
+.liveChatMessages {
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.liveChatEmpty {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 24px;
+  color: #858e9c;
+  text-align: center;
+}
+.liveChatEmpty i {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 5px;
+  border-radius: 50%;
+  background: #202631;
+  color: #79b4ff;
+  font-style: normal;
+}
+.liveChatEmpty strong {
+  color: #d9dee7;
+  font-size: 13px;
+}
+.liveChatEmpty span {
+  max-width: 190px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.liveChatMessage {
+  padding: 8px 9px;
+  margin-bottom: 5px;
+  border-radius: 10px;
+}
+.liveChatMessage:hover,
+.liveChatMessage.mine {
+  background: #191e26;
+}
+.liveChatMessage > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.liveChatMessage b {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #8dbdff;
+}
+.liveChatMessage em {
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #c8ff35;
+  color: #101510;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.liveChatMessage time {
+  margin-left: auto;
+  color: #6f7886;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.liveChatMessage > div > button {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: #8a94a3;
+  font-size: 17px;
+}
+.liveChatMessage > div > button:hover {
+  background: #3a1c22;
+  color: #ff929e;
+}
+.liveChatMessage p {
+  margin: 4px 0 0;
+  color: #e5e8ed;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.liveChatComposer {
+  padding: 11px 12px 12px;
+  border-top: 1px solid #292d35;
+  background: #14171d;
+}
+.liveChatComposer label {
+  display: block;
+  margin-bottom: 7px;
+  color: #8f98a6;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.liveChatComposer > div {
+  display: flex;
+  gap: 7px;
+}
+.liveChatComposer input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #363e4a;
+  border-radius: 10px;
+  background: #0a0d12;
+  color: #fff;
+  padding: 11px 12px;
+  font-size: 16px;
+}
+.liveChatComposer input:focus {
+  outline: 2px solid #2d8cff;
+  outline-offset: 1px;
+}
+.liveChatComposer button {
+  width: 42px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: #2d8cff;
+  color: #fff;
+  font-size: 17px;
+}
+.liveChatComposer button:disabled {
+  opacity: .35;
+}
+.liveChatComposer small {
+  display: block;
+  min-height: 14px;
+  margin-top: 5px;
+  color: #77808d;
+  font-size: 9px;
+  text-align: right;
+}
 @media (max-width: 800px) {
   .commissionerMediaControls button {
     width: 20%;
   }
   .commissionerMediaControls button.broadcastToggle {
     width: 20%;
+  }
+  .livekitWrap {
+    height: 800px;
+  }
+  .liveRoomGrid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 450px 350px;
+  }
+  .liveChatPanel {
+    border-left: 0;
+    border-top: 1px solid #292d35;
+  }
+  .liveChatHeader {
+    min-height: 58px;
+    padding: 10px 13px;
+  }
+  .liveChatMessages {
+    padding: 9px 10px;
+  }
+  .liveChatComposer {
+    padding-bottom: max(11px, env(safe-area-inset-bottom));
   }
 }
