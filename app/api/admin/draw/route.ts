@@ -11,9 +11,9 @@ export async function POST(req:Request){
   const {data:existing}=await s.from('prize_draws').select('id').eq('prize_id',prize.id).maybeSingle();if(existing)return NextResponse.json({error:'This prize has already been drawn.'},{status:409});
   let eligible:any[]=[];
   if(prize.eligibility?.draw_list_mode==='MANUAL')eligible=(prize.eligibility.manual_entries||[]).map((e:any)=>({id:String(e.id),entry_name:String(e.name),user_id:null}));
-  else{let q=s.from('entries').select('id,entry_name,user_id').eq('pool_id',prize.pool_id).eq('payment_status',prize.eligibility?.payment_status||'PAID');if(prize.eligibility?.entry_status)q=q.eq('entry_status',prize.eligibility.entry_status);const {data:raw,error}=await q;if(error)throw error;eligible=raw||[];
+  else{let q=s.from('entries').select('id,entry_name,user_id').eq('pool_id',prize.pool_id);if(prize.eligibility?.entry_status)q=q.eq('entry_status',prize.eligibility.entry_status);const {data:raw,error}=await q;if(error)throw error;eligible=raw||[];
    if(prize.eligibility?.one_prize_per_entry){const {data:wins}=await s.from('prize_draws').select('winner_entry_id,prizes!inner(pool_id)').eq('prizes.pool_id',prize.pool_id);const won=new Set((wins||[]).map((x:any)=>x.winner_entry_id));eligible=eligible.filter(e=>!won.has(e.id))}}
-  if(!eligible.length)return NextResponse.json({error:'No eligible paid, active entries.'},{status:400});
+  if(!eligible.length)return NextResponse.json({error:'No eligible active entries.'},{status:400});
   const entropy=randomBytes(32),index=Number(BigInt('0x'+entropy.toString('hex'))%BigInt(eligible.length)),winner=eligible[index],drawId=randomUUID(),snapshot=eligible.map(e=>({id:e.id,name:e.entry_name})),randomValue=entropy.toString('hex');
   const verificationHash=createHash('sha256').update(`${drawId}|${JSON.stringify(snapshot)}|${randomValue}`).digest('hex');
   const manual=String(winner.id).startsWith('manual-');
