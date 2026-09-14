@@ -8,9 +8,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { entryId, gameId, week, teamCode } = body;
     if (!entryId || !gameId || !week || !teamCode) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    const { data: entry } = await supabase.from('entries').select('id,user_id,pool_id,payment_status,entry_status').eq('id', entryId).single();
+    const { data: entry } = await supabase.from('entries').select('id,user_id,pool_id,entry_status').eq('id', entryId).single();
     if (!entry || entry.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    if (entry.payment_status !== 'PAID' || entry.entry_status !== 'ACTIVE') return NextResponse.json({ error: 'This entry is not eligible to make a pick.' }, { status: 403 });
+    if (entry.entry_status !== 'ACTIVE') return NextResponse.json({ error: 'This entry is not eligible to make a pick.' }, { status: 403 });
     const { data: game } = await supabase.from('games').select('id,season,week,home_team,away_team,kickoff_at,status').eq('id', gameId).single();
     if (!game || game.week !== Number(week) || ![game.home_team,game.away_team].includes(teamCode)) return NextResponse.json({ error: 'Invalid team selection.' }, { status: 400 });
     const [{data:pool},{data:weekGames}]=await Promise.all([
