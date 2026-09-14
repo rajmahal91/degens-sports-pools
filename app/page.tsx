@@ -601,16 +601,31 @@ export default function Home() {
             ) : (
               <a className="authLink" href="/auth/login">Sign In</a>
             ))}
-          <button
-            className="roleToggle"
-            onClick={() =>
-              setRole(role === "PLAYER" ? "COMMISSIONER" : "PLAYER")
-            }
-          >
-            {role === "PLAYER" ? "Commissioner" : "Player View"}
-          </button>
         </div>
       </header>
+
+      <section className={`viewModeBar ${role === "COMMISSIONER" ? "commissioner" : "player"}`} aria-label="Current account view">
+        <span className="viewModeIcon" aria-hidden="true">
+          {role === "COMMISSIONER" ? "C" : "P"}
+        </span>
+        <div>
+          <small>CURRENT VIEW</small>
+          <strong>{role === "COMMISSIONER" ? "Commissioner View" : "Player View"}</strong>
+          <span>
+            {role === "COMMISSIONER"
+              ? "Manage leagues, payments, scoring and prize draws."
+              : "Make picks and view your leagues, standings and prizes."}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="roleToggle"
+          aria-label={`Switch to ${role === "PLAYER" ? "Commissioner" : "Player"} View`}
+          onClick={() => setRole(role === "PLAYER" ? "COMMISSIONER" : "PLAYER")}
+        >
+          Switch to {role === "PLAYER" ? "Commissioner" : "Player"}
+        </button>
+      </section>
 
       {tab === "home" && (
         <section className="stack">
