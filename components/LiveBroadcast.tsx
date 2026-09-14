@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   isTrackReference,
   LiveKitRoom,
@@ -412,6 +412,182 @@ function ViewerStage() {
   );
 }
 
+type ChatMessage = {
+  kind: "message";
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  sentAt: number;
+  isHost: boolean;
+};
+
+type ChatEvent = ChatMessage | { kind: "delete"; id: string } | { kind: "clear" };
+
+function LiveChat({ asHost }: { asHost: boolean }) {
+  const room = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [notice, setNotice] = useState("");
+  const [sending, setSending] = useState(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const lastSentAt = useRef(0);
+  messagesRef.current = messages;
+
+  async function publish(event: ChatEvent) {
+    await room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify(event)),
+      { reliable: true, topic: "degens-live-chat" },
+    );
+  }
+
+  useEffect(() => {
+    const receive = (
+      payload: Uint8Array,
+      _participant: unknown,
+      _kind: unknown,
+      topic?: string,
+    ) => {
+      if (topic !== "degens-live-chat") return;
+      try {
+        const event = JSON.parse(new TextDecoder().decode(payload)) as ChatEvent;
+        if (event.kind === "clear") {
+          setMessages([]);
+        } else if (event.kind === "delete") {
+          setMessages((current) => current.filter((message) => message.id !== event.id));
+        } else if (event.kind === "message" && event.text && event.id) {
+          setMessages((current) =>
+            current.some((message) => message.id === event.id)
+              ? current
+              : [...current, event].slice(-150),
+          );
+        }
+      } catch {
+        // Ignore malformed room data.
+      }
+    };
+    room.on(RoomEvent.DataReceived, receive);
+    return () => {
+      room.off(RoomEvent.DataReceived, receive);
+    };
+  }, [room]);
+
+  useEffect(() => {
+    if (!asHost) return;
+    const replay = () => {
+      messagesRef.current.forEach((message) => void publish(message));
+    };
+    room.on(RoomEvent.ParticipantConnected, replay);
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, replay);
+    };
+  }, [asHost, room]);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    const text = draft.trim().replace(/\s+/g, " ").slice(0, 280);
+    if (!text || sending || room.state !== ConnectionState.Connected) return;
+    const now = Date.now();
+    if (now - lastSentAt.current < 700) {
+      setNotice("Please wait a moment before sending again.");
+      return;
+    }
+    const message: ChatMessage = {
+      kind: "message",
+      id: crypto.randomUUID(),
+      senderId: localParticipant.identity,
+      senderName: localParticipant.name || (asHost ? "Commissioner" : "Player"),
+      text,
+      sentAt: now,
+      isHost: asHost,
+    };
+    setSending(true);
+    setNotice("");
+    try {
+      await publish(message);
+      lastSentAt.current = now;
+      setMessages((current) => [...current, message].slice(-150));
+      setDraft("");
+    } catch {
+      setNotice("Message could not be sent. Try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function removeMessage(id: string) {
+    if (!asHost) return;
+    setMessages((current) => current.filter((message) => message.id !== id));
+    await publish({ kind: "delete", id }).catch(() => setNotice("Could not remove message."));
+  }
+
+  async function clearChat() {
+    if (!asHost || !messages.length) return;
+    setMessages([]);
+    await publish({ kind: "clear" }).catch(() => setNotice("Could not clear chat."));
+  }
+
+  return (
+    <aside className="liveChatPanel" aria-label="Live meeting chat">
+      <div className="liveChatHeader">
+        <div>
+          <strong>Meeting chat</strong>
+          <span>{messages.length ? `${messages.length} messages` : "Live discussion"}</span>
+        </div>
+        {asHost && messages.length > 0 && (
+          <button type="button" onClick={clearChat}>Clear</button>
+        )}
+      </div>
+      <div className="liveChatMessages" ref={listRef} aria-live="polite">
+        {!messages.length && (
+          <div className="liveChatEmpty">
+            <i>✦</i>
+            <strong>No messages yet</strong>
+            <span>Say hello or react to the live prize draw.</span>
+          </div>
+        )}
+        {messages.map((message) => {
+          const mine = message.senderId === localParticipant.identity;
+          return (
+            <article className={`liveChatMessage ${mine ? "mine" : ""}`} key={message.id}>
+              <div>
+                <b>{mine ? "You" : message.senderName}</b>
+                {message.isHost && <em>HOST</em>}
+                <time>{new Date(message.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>
+                {asHost && !mine && (
+                  <button type="button" aria-label={`Remove message from ${message.senderName}`} onClick={() => removeMessage(message.id)}>×</button>
+                )}
+              </div>
+              <p>{message.text}</p>
+            </article>
+          );
+        })}
+      </div>
+      <form className="liveChatComposer" onSubmit={send}>
+        <label htmlFor="live-chat-message">Message everyone</label>
+        <div>
+          <input
+            id="live-chat-message"
+            value={draft}
+            maxLength={280}
+            autoComplete="off"
+            placeholder="Type a message…"
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message">➤</button>
+        </div>
+        <small>{notice || `${draft.length}/280`}</small>
+      </form>
+    </aside>
+  );
+}
+
 export default function LiveBroadcast({
   asHost,
   meetingCode,
@@ -497,14 +673,19 @@ export default function LiveBroadcast({
             )
           }
         >
-          <MeetingStatus asHost={asHost} meetingCode={meetingCode} />
-          <LiveDrawSync
-            asHost={asHost}
-            state={drawState}
-            onState={onDrawState}
-          />
-          {cfg.role === "host" ? <VideoConference /> : <ViewerStage />}
-          {cfg.role === "host" && <CommissionerMediaControls />}
+          <div className="liveRoomGrid">
+            <div className="liveVideoPane">
+              <MeetingStatus asHost={asHost} meetingCode={meetingCode} />
+              <LiveDrawSync
+                asHost={asHost}
+                state={drawState}
+                onState={onDrawState}
+              />
+              {cfg.role === "host" ? <VideoConference /> : <ViewerStage />}
+              {cfg.role === "host" && <CommissionerMediaControls />}
+            </div>
+            <LiveChat asHost={cfg.role === "host"} />
+          </div>
         </LiveKitRoom>
       </div>
       {roomError && (
