@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  demoPayments,
   entries as seedEntries,
   leaderboard,
   pools as seedPools,
@@ -11,8 +10,6 @@ import {
 import type {
   Entry,
   FantasySlot,
-  PaymentMethod,
-  PaymentRecord,
   PickemSelection,
   Pool,
   SurvivorPick,
@@ -33,10 +30,6 @@ const demoPlayers: Record<string, string[]> = {
   WR: ["Ja’Marr Chase", "A.J. Brown", "Puka Nacua", "Nico Collins"],
   TE: ["George Kittle", "Travis Kelce", "Sam LaPorta", "Trey McBride"],
 };
-const money = (cents: number) =>
-  new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(
-    cents / 100,
-  );
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", {
     weekday: "short",
@@ -75,9 +68,6 @@ export default function Home() {
   const [entries, setEntries] = useState<Entry[]>(
     supabaseConfigured ? [] : seedEntries,
   );
-  const [payments, setPayments] = useState<PaymentRecord[]>(
-    supabaseConfigured ? [] : demoPayments,
-  );
   const [survivorPicks, setSurvivorPicks] = useState<SurvivorPick[]>([]);
   const [pendingSurvivor, setPendingSurvivor] = useState<{
     gameId: string;
@@ -97,11 +87,6 @@ export default function Home() {
   const [showFantasyPicker, setShowFantasyPicker] = useState<number | null>(
     null,
   );
-  const [paymentPool, setPaymentPool] = useState<Pool | null>(null);
-  const [paymentEntry, setPaymentEntry] = useState<Entry | null>(null);
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>("ETRANSFER");
-  const [reference, setReference] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [leaderboardType, setLeaderboardType] = useState<LeaderboardType>("SURVIVOR");
   const [leaderboardPoolId, setLeaderboardPoolId] = useState("");
@@ -121,7 +106,6 @@ export default function Home() {
         if (!r.ok) {
           setPools([]);
           setEntries([]);
-          setPayments([]);
           setAccount(null);
           setSignedOut(r.status === 401);
           if (r.status !== 401)
@@ -143,7 +127,6 @@ export default function Home() {
           type: p.contest_type || p.pool_type,
           status: p.status || (p.is_active ? "OPEN" : "CLOSED"),
           season: String(p.season || ""),
-          entryFeeCents: p.entry_fee_cents,
           registrationClosesAt: p.registration_closes_at || undefined,
         }));
         const mappedEntries: Entry[] = (b.entries || []).map((e: any) => ({
@@ -152,32 +135,7 @@ export default function Home() {
           userId: e.user_id,
           entryName: e.entry_name,
           status: e.status || e.entry_status,
-          paymentStatus: e.payment_status,
         }));
-        const poolNames = new Map(mappedPools.map((p) => [p.id, p.name]));
-        const entryNames = new Map(
-          mappedEntries.map((e) => [e.id, e.entryName]),
-        );
-        const mappedPayments: PaymentRecord[] = (b.payments || []).map(
-          (p: any) => {
-            const poolId =
-              p.pool_id ||
-              mappedEntries.find((e) => e.id === p.entry_id)?.poolId ||
-              "";
-            return {
-              id: p.id,
-              poolId,
-              poolName: poolNames.get(poolId) || "Pool",
-              entryId: p.entry_id || undefined,
-              entryName: entryNames.get(p.entry_id) || undefined,
-              amountCents: p.amount_cents,
-              method: p.method,
-              status: p.status,
-              reference: p.payer_reference || p.reference || undefined,
-              createdAt: p.created_at || p.submitted_at,
-            };
-          },
-        );
         const mappedGames = (b.games || []).map((g: any) => ({
           id: g.id,
           week: g.week,
@@ -222,7 +180,6 @@ export default function Home() {
         );
         setPools(mappedPools);
         setEntries(mappedEntries);
-        setPayments(mappedPayments);
         if (mappedGames.length) setGames(mappedGames);
         setSurvivorPicks(mappedSurvivor);
         setPickem(mappedPickem);
@@ -235,7 +192,6 @@ export default function Home() {
       .catch(() => {
         setPools([]);
         setEntries([]);
-        setPayments([]);
         setAccount(null);
         setNotice(
           "Your pool data could not be loaded. Please refresh the page.",
@@ -320,15 +276,6 @@ export default function Home() {
       .map((p) => p.teamCode),
   );
   const fantasyFilled = fantasy.filter((s) => s.player).length;
-  const pendingPayments = payments.filter((p) => p.status === "PENDING");
-  const paidTotal = payments
-    .filter((p) => p.status === "PAID")
-    .reduce((s, p) => s + p.amountCents, 0);
-  const outstanding = entries.filter(
-    (e) =>
-      e.paymentStatus === "UNPAID" &&
-      pools.find((p) => p.id === e.poolId)?.entryFeeCents,
-  ).length;
   const pickemEntries = entries.filter(
     (e) =>
       pickemPoolIds.has(e.poolId) &&
@@ -358,15 +305,8 @@ export default function Home() {
         alive: row.alive,
       }));
 
-  function poolStatus(pool: Pool) {
-    const mine = entries.filter((e) => e.poolId === pool.id);
-    if (pool.entryFeeCents === 0) return "PAID";
-    if (mine.some((e) => e.paymentStatus === "PAID")) return "PAID";
-    if (mine.some((e) => e.paymentStatus === "PENDING")) return "PENDING";
-    return "UNPAID";
-  }
   function selectSurvivor(gameId: string, teamCode: string, teamName: string) {
-    if (!activeSurvivor || activeSurvivor.paymentStatus !== "PAID") return;
+    if (!activeSurvivor) return;
     if (usedSurvivorTeams.has(teamCode)) return;
     setPendingSurvivor({ gameId, teamCode, teamName });
     setNotice(null);
@@ -478,89 +418,6 @@ export default function Home() {
       `All ${pickWeekGames.length} Week ${pickWeek} Pick’em selections are submitted and saved.`,
     );
   }
-  function openPayment(pool: Pool, entry?: Entry) {
-    setPaymentPool(pool);
-    setPaymentEntry(entry || entries.find((e) => e.poolId === pool.id) || null);
-    setPaymentMethod("ETRANSFER");
-    setReference("");
-    setNotice(null);
-  }
-  async function submitPayment() {
-    if (!paymentPool || !paymentEntry) return;
-    if (paymentMethod === "CARD") {
-      setNotice(
-        "Card checkout remains disabled until a processor explicitly approves this pool model.",
-      );
-      return;
-    }
-    if (paymentMethod === "ETRANSFER" && reference.trim().length < 3) {
-      setNotice("Enter the e-transfer confirmation/reference.");
-      return;
-    }
-    let persistedPaymentId: string | undefined;
-    if (connected) {
-      const r = await fetch("/api/payments/submit", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          poolId: paymentPool.id,
-          entryId: paymentEntry.id,
-          method: paymentMethod,
-          reference: reference.trim(),
-        }),
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        setNotice(j.error || "Payment submission failed");
-        return;
-      }
-      persistedPaymentId = j.payment?.id;
-    }
-    const rec: PaymentRecord = {
-      id: persistedPaymentId || crypto.randomUUID(),
-      poolId: paymentPool.id,
-      poolName: paymentPool.name,
-      entryId: paymentEntry.id,
-      entryName: paymentEntry.entryName,
-      amountCents: paymentPool.entryFeeCents,
-      method: paymentMethod,
-      status: "PENDING",
-      reference: reference.trim() || undefined,
-      createdAt: new Date().toISOString(),
-    };
-    setPayments((prev) => [rec, ...prev]);
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === paymentEntry.id ? { ...e, paymentStatus: "PENDING" } : e,
-      ),
-    );
-    setNotice("Payment submitted. Commissioner verification is now pending.");
-  }
-  async function verifyPayment(id: string) {
-    const p = payments.find((x) => x.id === id);
-    if (!p) return;
-    if (connected) {
-      const r = await fetch("/api/admin/payments/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ paymentId: id }),
-      });
-      if (!r.ok) {
-        const j = await r.json();
-        setNotice(j.error || "Verification failed");
-        return;
-      }
-    }
-    setPayments((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, status: "PAID" } : x)),
-    );
-    if (p.entryId)
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === p.entryId ? { ...e, paymentStatus: "PAID" } : e,
-        ),
-      );
-  }
   function openPoolPicks(pool: Pool) {
     const entry = entries.find((e) => e.poolId === pool.id);
     if (entry) setActiveEntry(entry.id);
@@ -637,7 +494,7 @@ export default function Home() {
             </h1>
             <p>
               {role === "COMMISSIONER"
-                ? "Payments, entries, picks, deadlines and prize draws."
+                ? "Entries, picks, deadlines, standings and prize draws."
                 : "Survivor, Pick’em, playoff fantasy, brackets and live draws."}
             </p>
           </div>
@@ -704,8 +561,8 @@ export default function Home() {
                   <span>Pick’em made</span>
                 </div>
                 <div>
-                  <b>{outstanding}</b>
-                  <span>Fees due</span>
+                  <b>{pools.length}</b>
+                  <span>Active pools</span>
                 </div>
               </div>
               <div className="alert">
@@ -723,12 +580,12 @@ export default function Home() {
                 <span>Demo entries</span>
               </div>
               <div>
-                <b>{pendingPayments.length}</b>
-                <span>Payments pending</span>
+                <b>{pools.length}</b>
+                <span>Managed pools</span>
               </div>
               <div>
-                <b>{money(paidTotal)}</b>
-                <span>Verified</span>
+                <b>{currentWeek}</b>
+                <span>Current week</span>
               </div>
             </div>
           )}
@@ -747,8 +604,7 @@ export default function Home() {
             </a>
           </div>
           <p className="sectionIntro">
-            Choose a pool to make picks, manage your entries, or check payment
-            status.
+            Choose a pool to make picks or manage your entries.
           </p>
           {loading ? (
             <div className="wideCard">
@@ -776,9 +632,6 @@ export default function Home() {
                 const poolEntries = entries.filter(
                   (entry) => entry.poolId === pool.id,
                 );
-                const firstUnpaid = poolEntries.find(
-                  (entry) => entry.paymentStatus === "UNPAID",
-                );
                 const canMakePicks =
                   poolEntries.length > 0 &&
                   ["SURVIVOR", "PICKEM", "PLAYOFF_FANTASY"].includes(
@@ -800,13 +653,7 @@ export default function Home() {
                           {pool.season} · {pool.type.replaceAll("_", " ")}
                         </span>
                       </div>
-                      {poolEntries.length > 0 && (
-                        <span
-                          className={`pill ${poolStatus(pool).toLowerCase()}`}
-                        >
-                          {poolStatus(pool)}
-                        </span>
-                      )}
+                      {poolEntries.length > 0 && <span className="pill paid">Joined</span>}
                     </div>
                     <div className="poolHubMeta">
                       <div>
@@ -814,12 +661,8 @@ export default function Home() {
                         <b>{poolEntries.length}</b>
                       </div>
                       <div>
-                        <span>Entry fee</span>
-                        <b>
-                          {pool.entryFeeCents
-                            ? money(pool.entryFeeCents)
-                            : "Free"}
-                        </b>
+                        <span>Format</span>
+                        <b>{pool.type.replaceAll("_", " ")}</b>
                       </div>
                       <div>
                         <span>Current round</span>
@@ -842,14 +685,6 @@ export default function Home() {
                           View & Make Picks
                         </button>
                       )}
-                      {firstUnpaid && pool.entryFeeCents > 0 && (
-                        <button
-                          className="secondary poolSecondary"
-                          onClick={() => openPayment(pool, firstUnpaid)}
-                        >
-                          Pay Entry Fee
-                        </button>
-                      )}
                       {role === "COMMISSIONER" && (
                         <a
                           className="secondary poolSecondary"
@@ -859,13 +694,6 @@ export default function Home() {
                         </a>
                       )}
                     </div>
-                    {poolEntries.some(
-                      (entry) => entry.paymentStatus === "PENDING",
-                    ) && (
-                      <div className="pendingNote">
-                        Payment submitted — awaiting commissioner verification.
-                      </div>
-                    )}
                   </article>
                 );
               })}
@@ -946,15 +774,10 @@ export default function Home() {
                     }}
                   >
                     {e.entryName}
-                    <small>{e.paymentStatus}</small>
+                    <small>{e.status}</small>
                   </button>
                 ))}
               </div>
-              {activeSurvivor?.paymentStatus !== "PAID" && (
-                <div className="warning">
-                  This entry must be paid before a pick can be submitted.
-                </div>
-              )}
               {usedSurvivorTeams.size > 0 && (
                 <div className="ruleBox">
                   <strong>Teams saved in another week are unavailable</strong>
@@ -974,7 +797,6 @@ export default function Home() {
                   <div className="matchup">
                     <button
                       disabled={
-                        activeSurvivor?.paymentStatus !== "PAID" ||
                         usedSurvivorTeams.has(g.awayCode)
                       }
                       className={
@@ -990,7 +812,6 @@ export default function Home() {
                     <span className="at">@</span>
                     <button
                       disabled={
-                        activeSurvivor?.paymentStatus !== "PAID" ||
                         usedSurvivorTeams.has(g.homeCode)
                       }
                       className={
@@ -1224,7 +1045,7 @@ export default function Home() {
             ))
           ) : (
             <div className="wideCard">
-              <span>No paid entries are ranked in this pool yet.</span>
+              <span>No entries are ranked in this pool yet.</span>
             </div>
           )}
         </section>
@@ -1248,41 +1069,14 @@ export default function Home() {
                   <span>Entries</span>
                 </div>
                 <div>
-                  <b>{pendingPayments.length}</b>
-                  <span>Pending</span>
+                  <b>{pools.length}</b>
+                  <span>Pools</span>
                 </div>
                 <div>
-                  <b>{money(paidTotal)}</b>
-                  <span>Collected</span>
+                  <b>{currentWeek}</b>
+                  <span>Current week</span>
                 </div>
               </div>
-              <h2>Payment Verification</h2>
-              {pendingPayments.length === 0 ? (
-                <div className="wideCard">
-                  <span>No payments awaiting verification.</span>
-                </div>
-              ) : (
-                pendingPayments.map((p) => (
-                  <div className="adminPayment" key={p.id}>
-                    <div>
-                      <strong>{p.entryName}</strong>
-                      <span>
-                        {p.poolName} · {p.method}
-                      </span>
-                      <small>Ref: {p.reference || "—"}</small>
-                    </div>
-                    <div>
-                      <b>{money(p.amountCents)}</b>
-                      <button
-                        className="verify"
-                        onClick={() => verifyPayment(p.id)}
-                      >
-                        Verify Paid
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
               <h2>Commissioner Actions</h2>
               <div className="actionGrid">
                 <button>Send Pick Reminder</button>
@@ -1326,75 +1120,6 @@ export default function Home() {
                 </button>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {paymentPool && paymentEntry && (
-        <div className="sheet">
-          <div className="sheetInner paymentSheet">
-            <div className="grabber" />
-            <div className="sectionHeader">
-              <div>
-                <span className="eyebrow">ENTRY PAYMENT</span>
-                <h2>{paymentEntry.entryName}</h2>
-              </div>
-              <button className="close" onClick={() => setPaymentPool(null)}>
-                ×
-              </button>
-            </div>
-            <div className="paymentTotal">
-              <span>{paymentPool.name}</span>
-              <strong>{money(paymentPool.entryFeeCents)}</strong>
-            </div>
-            <label className="fieldLabel">Payment method</label>
-            <div className="methodGrid">
-              {(["ETRANSFER", "CARD", "CASH"] as PaymentMethod[]).map((m) => (
-                <button
-                  key={m}
-                  className={
-                    paymentMethod === m ? "method activeMethod" : "method"
-                  }
-                  onClick={() => {
-                    setPaymentMethod(m);
-                    setNotice(null);
-                  }}
-                >
-                  <b>
-                    {m === "ETRANSFER"
-                      ? "Interac e-Transfer"
-                      : m === "CARD"
-                        ? "Credit / Debit Card"
-                        : "Cash"}
-                  </b>
-                </button>
-              ))}
-            </div>
-            {paymentMethod === "ETRANSFER" && (
-              <div className="methodPanel">
-                <strong>
-                  Send your e-transfer, then enter the confirmation
-                </strong>
-                <input
-                  className="textInput"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="Confirmation number"
-                />
-              </div>
-            )}
-            {paymentMethod === "CARD" && (
-              <div className="methodPanel">
-                <strong>Hosted checkout adapter</strong>
-                <p>Enabled only after an approved processor is configured.</p>
-              </div>
-            )}
-            {notice && <div className="notice">{notice}</div>}
-            <button className="primary" onClick={submitPayment}>
-              {paymentMethod === "CARD"
-                ? "Continue to Checkout"
-                : "Submit Payment"}
-            </button>
           </div>
         </div>
       )}
