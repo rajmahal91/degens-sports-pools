@@ -1,8 +1,6 @@
 export type Sport = 'NFL' | 'NHL' | 'NBA';
 export type ContestType = 'SURVIVOR' | 'PICKEM' | 'BRACKET' | 'PLAYOFF_FANTASY';
 export type Position = 'QB' | 'RB' | 'WR' | 'TE';
-export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED';
-export type PaymentMethod = 'ETRANSFER' | 'CASH' | 'CARD';
 export type EntryStatus = 'ACTIVE' | 'ELIMINATED' | 'COMPLETE';
 export type UserRole = 'PLAYER' | 'COMMISSIONER';
 
@@ -13,7 +11,6 @@ export interface Pool {
   type: ContestType;
   status: 'OPEN' | 'ACTIVE' | 'COMPLETE';
   season: string;
-  entryFeeCents: number;
   registrationClosesAt?: string;
 }
 
@@ -23,7 +20,6 @@ export interface Entry {
   userId: string;
   entryName: string;
   status: EntryStatus;
-  paymentStatus: PaymentStatus;
   rank?: number;
   score?: number;
 }
@@ -34,19 +30,6 @@ export interface FantasySlot {
   player?: string;
   locked?: boolean;
   points?: number;
-}
-
-export interface PaymentRecord {
-  id: string;
-  poolId: string;
-  poolName: string;
-  entryId?: string;
-  entryName?: string;
-  amountCents: number;
-  method: PaymentMethod;
-  status: PaymentStatus;
-  reference?: string;
-  createdAt: string;
 }
 
 export interface SurvivorPick {
