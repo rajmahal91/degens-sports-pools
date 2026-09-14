@@ -3092,73 +3092,33 @@ a {
   font-size: 9px;
   text-align: right;
 }
-.viewModeBar {
-  max-width: 1180px;
-  margin: 4px auto 18px;
-  padding: 12px 14px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+.viewSwitcher {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  border: 1px solid #2f3947;
-  border-radius: 15px;
-  background: linear-gradient(135deg, #111923, #10141a);
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #303846;
+  border-radius: 10px;
+  background: #10141a;
 }
-.viewModeBar.commissioner {
-  border-color: #65532d;
-  background: linear-gradient(135deg, #201b11, #12151a 65%);
+.viewSwitcher button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 10px;
+  background: transparent;
+  color: #838d9b;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
 }
-.viewModeIcon {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
+.viewSwitcher button.active.player {
   background: #2d8cff;
   color: #fff;
-  font-size: 16px;
-  font-weight: 900;
-  box-shadow: 0 0 0 4px #2d8cff1f;
 }
-.viewModeBar.commissioner .viewModeIcon {
+.viewSwitcher button.active.commissioner {
   background: #d6a94e;
   color: #171108;
-  box-shadow: 0 0 0 4px #d6a94e1f;
-}
-.viewModeBar > div {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: baseline;
-  column-gap: 9px;
-}
-.viewModeBar small {
-  color: #7d8795;
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: .14em;
-}
-.viewModeBar strong {
-  color: #fff;
-  font-size: 15px;
-}
-.viewModeBar > div > span {
-  grid-column: 1 / -1;
-  margin-top: 2px;
-  color: #929baa;
-  font-size: 11px;
-}
-.viewModeBar .roleToggle {
-  min-height: 42px;
-  padding: 10px 14px;
-  border-color: #465366;
-  background: #202936;
-  color: #fff;
-  white-space: nowrap;
-}
-.viewModeBar.commissioner .roleToggle {
-  border-color: #6a5834;
-  background: #292215;
 }
 @media (max-width: 800px) {
   .drawPage {
@@ -3233,30 +3193,15 @@ a {
   }
 }
 @media (max-width: 600px) {
-  .viewModeBar {
-    margin: 0 0 14px;
-    padding: 11px;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 10px;
-    border-radius: 14px;
-  }
-  .viewModeIcon {
-    width: 38px;
-    height: 38px;
-  }
-  .viewModeBar > div {
-    grid-template-columns: 1fr;
-  }
-  .viewModeBar small {
-    margin-bottom: 1px;
-  }
-  .viewModeBar > div > span {
-    display: none;
-  }
-  .viewModeBar .roleToggle {
-    grid-column: 1 / -1;
+  .viewSwitcher {
     width: 100%;
-    min-height: 44px;
+    order: 2;
+  }
+  .viewSwitcher button {
+    flex: 1;
+    min-height: 40px;
+    padding-inline: 6px;
+    font-size: 11px;
   }
 }
 @media (max-width: 390px) {
