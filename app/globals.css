@@ -891,6 +891,27 @@ p {
   border-radius: 16px;
   padding: 13px;
 }
+.pickemGame > div:first-child small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.pickButtons button {
+  display: flex;
+  min-width: 76px;
+  min-height: 52px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.pickButtons button small {
+  color: #b9d5ff;
+  font-size: 9px;
+  font-weight: 700;
+}
 .pickemGame > div:first-child {
   display: flex;
   flex-direction: column;
@@ -905,7 +926,7 @@ p {
   gap: 6px;
 }
 .pickButtons button {
-  min-width: 46px;
+  min-width: 70px;
   border: 1px solid var(--line);
   background: var(--panel2);
   color: var(--text);
