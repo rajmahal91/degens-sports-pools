@@ -9,6 +9,12 @@ type StandingRow = {
   score: number;
   detail: string;
   alive?: boolean;
+  picks?: Array<{
+    week: number;
+    teamCode: string | null;
+    locked: boolean;
+    result: "WIN" | "LOSS" | "PENDING";
+  }>;
 };
 
 type LeaderboardEntry = {
@@ -26,6 +32,13 @@ type PickemWeeklyEntry = {
   weekly_graded: number;
   total_score: number;
   total_graded: number;
+};
+
+type SurvivorGridEntry = {
+  entry_id: string;
+  entry_name: string;
+  entry_status: string;
+  picks: StandingRow["picks"];
 };
 
 function rankRows(rows: Omit<StandingRow, "rank">[]) {
@@ -59,6 +72,47 @@ export async function GET(request: Request) {
       .eq("id", poolId)
       .single();
     if (poolError || !pool) return NextResponse.json({ error: "Pool not found or access denied." }, { status: 403 });
+
+    if (pool.pool_type === "SURVIVOR") {
+      const { data: gridData, error: gridError } = await supabase.rpc(
+        "get_survivor_grid_rows",
+        { p_pool_id: pool.id },
+      );
+      if (gridError) {
+        console.error("Survivor grid query failed", gridError);
+        throw new Error(gridError.message);
+      }
+      const prepared = ((gridData || []) as SurvivorGridEntry[])
+        .map((entry) => {
+          const picks = Array.isArray(entry.picks) ? entry.picks : [];
+          const wins = picks.filter((pick) => pick.result === "WIN").length;
+          const loss = picks.find((pick) => pick.result === "LOSS");
+          const alive = entry.entry_status === "ACTIVE";
+          return {
+            entryId: entry.entry_id,
+            name: entry.entry_name,
+            status: alive ? "Alive" : "Eliminated",
+            score: wins,
+            detail: alive
+              ? `${wins} win${wins === 1 ? "" : "s"}`
+              : loss
+                ? `Out in Week ${loss.week}`
+                : "Eliminated",
+            alive,
+            picks,
+          };
+        })
+        .sort(
+          (a, b) =>
+            Number(b.alive) - Number(a.alive) ||
+            b.score - a.score ||
+            a.name.localeCompare(b.name),
+        );
+      return NextResponse.json({
+        pool: { id: pool.id, name: pool.name, type: pool.pool_type },
+        rows: rankRows(prepared),
+      });
+    }
 
     if (pool.pool_type === "PICKEM" && week !== null) {
       const { data: weeklyData, error: weeklyError } = await supabase.rpc(
@@ -97,22 +151,7 @@ export async function GET(request: Request) {
     }
 
     let rows: StandingRow[] = [];
-    if (pool.pool_type === "SURVIVOR") {
-      const prepared = entries.map((entry) => {
-        const wins = Number(entry.score || 0);
-        const lossWeek = entry.secondary_value;
-        const alive = entry.entry_status === "ACTIVE";
-        return {
-          entryId: entry.entry_id,
-          name: entry.entry_name,
-          status: alive ? "Alive" : "Eliminated",
-          score: wins,
-          detail: alive ? `${wins} win${wins === 1 ? "" : "s"}` : lossWeek ? `Out in Week ${lossWeek}` : "Eliminated",
-          alive,
-        };
-      }).sort((a, b) => Number(b.alive) - Number(a.alive) || b.score - a.score || a.name.localeCompare(b.name));
-      rows = rankRows(prepared);
-    } else if (pool.pool_type === "PICKEM") {
+    if (pool.pool_type === "PICKEM") {
       const prepared = entries.map((entry) => {
         const correct = Number(entry.score || 0);
         const graded = Number(entry.secondary_value || 0);
