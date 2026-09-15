@@ -219,7 +219,8 @@ export default function Home() {
     let stopped=false;
     const refresh=async()=>{
       try{
-        const response=await fetch(`/api/nfl/live?season=${season}&week=${currentWeek}`,{cache:'no-store'});
+        const displayedWeek=tab==="pools"?pickWeek:currentWeek;
+        const response=await fetch(`/api/nfl/live?season=${season}&week=${displayedWeek}&currentWeek=${currentWeek}`,{cache:'no-store'});
         if(!response.ok||stopped)return;
         const body=await response.json();
         const updated=(body.games||[]).map((g:any)=>({id:g.id,week:g.week,away:g.away_team,awayCode:g.away_team,home:g.home_team,homeCode:g.home_team,kickoff:g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined,awayWinProbability:g.raw?.market?.awayWinProbability??undefined,homeWinProbability:g.raw?.market?.homeWinProbability??undefined,marketProvider:g.raw?.market?.provider??undefined}));
@@ -235,7 +236,7 @@ export default function Home() {
     refresh();
     const timer=window.setInterval(refresh,60000);
     return()=>{stopped=true;window.clearInterval(timer);};
-  },[connected,currentWeek,selectedPoolId,pools]);
+  },[connected,currentWeek,pickWeek,selectedPoolId,pools,tab]);
 
   useEffect(() => {
     if (tab !== "leaderboard" || !supabaseConfigured) return;
@@ -849,7 +850,7 @@ export default function Home() {
                       <b>{g.awayCode}</b>
                       <span>{g.away}</span>
                       {g.awayWinProbability !== undefined && <em className="marketProbability">Market {Math.round(g.awayWinProbability*100)}%</em>}
-                      {g.awayScore !== undefined && <strong>{g.awayScore}</strong>}
+                      {g.status !== "SCHEDULED" && g.awayScore !== undefined && <strong>{g.awayScore}</strong>}
                     </button>
                     <span className="at">@</span>
                     <button
@@ -866,7 +867,7 @@ export default function Home() {
                       <b>{g.homeCode}</b>
                       <span>{g.home}</span>
                       {g.homeWinProbability !== undefined && <em className="marketProbability">Market {Math.round(g.homeWinProbability*100)}%</em>}
-                      {g.homeScore !== undefined && <strong>{g.homeScore}</strong>}
+                      {g.status !== "SCHEDULED" && g.homeScore !== undefined && <strong>{g.homeScore}</strong>}
                     </button>
                   </div>
                 </div>
@@ -939,19 +940,22 @@ export default function Home() {
                         {g.awayCode} @ {g.homeCode}
                       </strong>
                       <span>{when(g.kickoff)}</span>
+                      <small>{g.status === "FINAL" ? `FINAL · ${g.awayScore ?? 0}–${g.homeScore ?? 0}` : g.status === "LIVE" ? `LIVE · ${g.awayScore ?? 0}–${g.homeScore ?? 0}` : "SCHEDULED"}</small>
                     </div>
                     <div className="pickButtons">
                       <button
                         className={sel?.teamCode === g.awayCode ? "chosen" : ""}
                         onClick={() => togglePickem(g.id, g.awayCode)}
                       >
-                        {g.awayCode}
+                        <b>{g.awayCode}</b>
+                        {g.awayWinProbability !== undefined && <small>Market {Math.round(g.awayWinProbability*100)}%</small>}
                       </button>
                       <button
                         className={sel?.teamCode === g.homeCode ? "chosen" : ""}
                         onClick={() => togglePickem(g.id, g.homeCode)}
                       >
-                        {g.homeCode}
+                        <b>{g.homeCode}</b>
+                        {g.homeWinProbability !== undefined && <small>Market {Math.round(g.homeWinProbability*100)}%</small>}
                       </button>
                     </div>
                   </div>
