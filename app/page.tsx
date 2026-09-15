@@ -514,6 +514,10 @@ export default function Home() {
     );
   }
   function openPoolPicks(pool: Pool) {
+    if (pool.type === "PLAYOFF_FANTASY") {
+      window.location.href = `/fantasy?pool=${encodeURIComponent(pool.id)}`;
+      return;
+    }
     const entry = entries.find((e) => e.poolId === pool.id);
     if (entry) setActiveEntry(entry.id);
     setSelectedPoolId(pool.id);
@@ -521,7 +525,6 @@ export default function Home() {
     setPendingSurvivor(null);
     if (pool.type === "SURVIVOR") setPickMode("survivor");
     if (pool.type === "PICKEM") setPickMode("pickem");
-    if (pool.type === "PLAYOFF_FANTASY") setPickMode("fantasy");
     setTab("pools");
   }
   function pickFantasy(i: number, player: string) {
@@ -686,8 +689,8 @@ export default function Home() {
                 <span>Demo entries</span>
               </div>
               <div>
-                <b>{manageablePoolIds.length}</b>
-                <span>Managed pools</span>
+                  <b>{manageablePoolIds.length}</b>
+                  <span>Managed pools</span>
               </div>
               <div>
                 <b>{currentWeek}</b>
