@@ -1215,7 +1215,10 @@ export default function Home() {
               </div>
               <div className="survivorGridWrap">
                 <div className="survivorGrid survivorGridHeader">
-                  <div>Entry</div>
+                  <div className="survivorEntryHeader">
+                    <b>#</b>
+                    <span>Entry</span>
+                  </div>
                   {Array.from({ length: 18 }, (_, index) => (
                     <div key={index}>W{index + 1}</div>
                   ))}
