@@ -113,6 +113,7 @@ export default function Home() {
   const [notice, setNotice] = useState<string | null>(null);
   const [leaderboardType, setLeaderboardType] = useState<LeaderboardType>("SURVIVOR");
   const [leaderboardPoolId, setLeaderboardPoolId] = useState("");
+  const [leaderboardWeek, setLeaderboardWeek] = useState<number | null>(null);
   const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
@@ -282,7 +283,11 @@ export default function Home() {
     const controller = new AbortController();
     setLeaderboardLoading(true);
     setLeaderboardError("");
-    fetch(`/api/leaderboard?poolId=${encodeURIComponent(selected.id)}`, { signal: controller.signal })
+    const weekQuery =
+      leaderboardType === "PICKEM" && leaderboardWeek !== null
+        ? `&week=${leaderboardWeek}`
+        : "";
+    fetch(`/api/leaderboard?poolId=${encodeURIComponent(selected.id)}${weekQuery}`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Could not load standings.");
@@ -297,7 +302,7 @@ export default function Home() {
         if (!controller.signal.aborted) setLeaderboardLoading(false);
       });
     return () => controller.abort();
-  }, [tab, supabaseConfigured, pools, leaderboardType, leaderboardPoolId]);
+  }, [tab, supabaseConfigured, pools, leaderboardType, leaderboardPoolId, leaderboardWeek]);
 
   const survivorPoolIds = new Set(
     pools
@@ -1105,6 +1110,7 @@ export default function Home() {
                 onClick={() => {
                   setLeaderboardType(type);
                   setLeaderboardPoolId("");
+                  setLeaderboardWeek(null);
                   setLeaderboardRows([]);
                 }}
               >
@@ -1127,6 +1133,35 @@ export default function Home() {
                   {pool.name}
                 </button>
               ))}
+            </div>
+          )}
+          {leaderboardType === "PICKEM" && leaderboardPools.length > 0 && (
+            <div className="weekTabs" aria-label="Choose Pick'em standings period">
+              <button
+                type="button"
+                className={leaderboardWeek === null ? "weekActive" : ""}
+                onClick={() => {
+                  setLeaderboardWeek(null);
+                  setLeaderboardRows([]);
+                }}
+              >
+                Season
+              </button>
+              {Array.from({ length: 18 }, (_, index) => index + 1).map(
+                (week) => (
+                  <button
+                    type="button"
+                    key={week}
+                    className={`${leaderboardWeek === week ? "weekActive" : ""} ${week === currentWeek ? "weekCurrent" : ""}`}
+                    onClick={() => {
+                      setLeaderboardWeek(week);
+                      setLeaderboardRows([]);
+                    }}
+                  >
+                    Week {week}
+                  </button>
+                ),
+              )}
             </div>
           )}
           {leaderboardLoading ? (
