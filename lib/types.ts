@@ -52,6 +52,9 @@ export interface NFLGame {
   status: 'SCHEDULED' | 'LIVE' | 'FINAL';
   awayScore?: number;
   homeScore?: number;
+  awayWinProbability?: number;
+  homeWinProbability?: number;
+  marketProvider?: string;
 }
 
 export interface PickemSelection {
