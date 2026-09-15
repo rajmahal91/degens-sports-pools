@@ -208,7 +208,11 @@ export default function Home() {
 
   useEffect(()=>{
     if(!connected||!games.length)return;
-    const season=Number(games.find(game=>game.week===currentWeek)?.kickoff.slice(0,4)||new Date().getUTCFullYear());
+    const season=Number(
+      pools.find(pool=>pool.id===selectedPoolId)?.season||
+      pools.find(pool=>pool.sport==="NFL"&&pool.type==="SURVIVOR")?.season||
+      new Date().getUTCFullYear(),
+    );
     let stopped=false;
     const refresh=async()=>{
       try{
@@ -216,7 +220,8 @@ export default function Home() {
         if(!response.ok||stopped)return;
         const body=await response.json();
         const updated=(body.games||[]).map((g:any)=>({id:g.id,week:g.week,away:g.away_team,awayCode:g.away_team,home:g.home_team,homeCode:g.home_team,kickoff:g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
-        setGames(current=>[...current.filter(game=>game.week!==currentWeek),...updated]);
+        const refreshedWeeks=new Set<number>(updated.map((game:{week:number})=>game.week));
+        setGames(current=>[...current.filter(game=>!refreshedWeeks.has(game.week)),...updated]);
         const statuses=new Map((body.entries||[]).map((entry:any)=>[entry.id,entry.entry_status]));
         setEntries(current=>current.map(entry=>statuses.has(entry.id)?{...entry,status:statuses.get(entry.id) as Entry['status']}:entry));
         const results=new Map((body.picks||[]).map((pick:any)=>[`${pick.entry_id}-${pick.week}`,pick.result||'PENDING']));
@@ -227,7 +232,7 @@ export default function Home() {
     refresh();
     const timer=window.setInterval(refresh,60000);
     return()=>{stopped=true;window.clearInterval(timer);};
-  },[connected,currentWeek]);
+  },[connected,currentWeek,selectedPoolId,pools]);
 
   useEffect(() => {
     if (tab !== "leaderboard" || !supabaseConfigured) return;
