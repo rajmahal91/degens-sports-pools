@@ -10,6 +10,7 @@ import {
 import type {
   Entry,
   FantasySlot,
+  NFLGame,
   PickemSelection,
   Pool,
   SurvivorPick,
@@ -38,6 +39,27 @@ const when = (iso: string) =>
     hour: "numeric",
     minute: "2-digit",
   });
+
+function pickemLockTime(
+  game: NFLGame,
+  weekGames: NFLGame[],
+  deadlineMode: Pool["deadlineMode"],
+) {
+  const kickoff = new Date(game.kickoff).getTime();
+  if (deadlineMode !== "SUNDAY_10AM_PT") return kickoff;
+  const sundayKickoffs = weekGames
+    .filter(
+      (weekGame) =>
+        new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Vancouver",
+          weekday: "short",
+        }).format(new Date(weekGame.kickoff)) === "Sun",
+    )
+    .map((weekGame) => new Date(weekGame.kickoff).getTime())
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  return Math.min(kickoff, sundayKickoffs[0] ?? kickoff);
+}
 
 type LeaderboardType = "SURVIVOR" | "PICKEM" | "PLAYOFF_FANTASY";
 type LeaderboardRow = {
@@ -129,6 +151,10 @@ export default function Home() {
           status: p.status || (p.is_active ? "OPEN" : "CLOSED"),
           season: String(p.season || ""),
           registrationClosesAt: p.registration_closes_at || undefined,
+          deadlineMode:
+            p.scoring_settings?.deadline_mode === "SUNDAY_10AM_PT"
+              ? "SUNDAY_10AM_PT"
+              : "GAME_KICKOFF",
         }));
         const mappedEntries: Entry[] = (b.entries || []).map((e: any) => ({
           id: e.id,
@@ -400,6 +426,20 @@ export default function Home() {
   }
   async function togglePickem(gameId: string, teamCode: string) {
     if (!pickemEntry) return;
+    const game = games.find((candidate) => candidate.id === gameId);
+    const pool = pools.find((candidate) => candidate.id === pickemEntry.poolId);
+    if (
+      !game ||
+      game.status !== "SCHEDULED" ||
+      pickemLockTime(
+        game,
+        games.filter((candidate) => candidate.week === game.week),
+        pool?.deadlineMode,
+      ) <= nowMs
+    ) {
+      setNotice("That game is locked and its pick can no longer be changed.");
+      return;
+    }
     const entryId = pickemEntry.id;
     const previous = pickem.find(
       (p) => p.entryId === entryId && p.gameId === gameId,
@@ -933,18 +973,37 @@ export default function Home() {
                 const sel = pickem.find(
                   (p) => p.gameId === g.id && p.entryId === pickemEntry?.id,
                 );
+                const locked =
+                  g.status !== "SCHEDULED" ||
+                  pickemLockTime(
+                    g,
+                    pickWeekGames,
+                    activePoolForPicks?.deadlineMode,
+                  ) <= nowMs;
                 return (
-                  <div className="pickemGame" key={g.id}>
+                  <div
+                    className={locked ? "pickemGame locked" : "pickemGame"}
+                    key={g.id}
+                  >
                     <div>
                       <strong>
                         {g.awayCode} @ {g.homeCode}
                       </strong>
                       <span>{when(g.kickoff)}</span>
-                      <small>{g.status === "FINAL" ? `FINAL · ${g.awayScore ?? 0}–${g.homeScore ?? 0}` : g.status === "LIVE" ? `LIVE · ${g.awayScore ?? 0}–${g.homeScore ?? 0}` : "SCHEDULED"}</small>
+                      <small>
+                        {g.status === "FINAL"
+                          ? `FINAL · ${g.awayScore ?? 0}–${g.homeScore ?? 0}`
+                          : g.status === "LIVE"
+                            ? `LIVE · ${g.awayScore ?? 0}–${g.homeScore ?? 0}`
+                            : locked
+                              ? "LOCKED"
+                              : "OPEN"}
+                      </small>
                     </div>
                     <div className="pickButtons">
                       <button
                         className={sel?.teamCode === g.awayCode ? "chosen" : ""}
+                        disabled={locked || pickemEntry?.status !== "ACTIVE"}
                         onClick={() => togglePickem(g.id, g.awayCode)}
                       >
                         <b>{g.awayCode}</b>
@@ -952,6 +1011,7 @@ export default function Home() {
                       </button>
                       <button
                         className={sel?.teamCode === g.homeCode ? "chosen" : ""}
+                        disabled={locked || pickemEntry?.status !== "ACTIVE"}
                         onClick={() => togglePickem(g.id, g.homeCode)}
                       >
                         <b>{g.homeCode}</b>
