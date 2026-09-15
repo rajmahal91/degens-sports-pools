@@ -70,6 +70,12 @@ type LeaderboardRow = {
   score: number;
   detail: string;
   alive?: boolean;
+  picks?: Array<{
+    week: number;
+    teamCode: string | null;
+    locked: boolean;
+    result: "WIN" | "LOSS" | "PENDING";
+  }>;
 };
 
 export default function Home() {
@@ -1200,6 +1206,65 @@ export default function Home() {
             <div className="wideCard">
               <span>You do not have a {leaderboardType === "PLAYOFF_FANTASY" ? "Fantasy" : leaderboardType === "PICKEM" ? "Pick’em" : "Survivor"} pool yet.</span>
             </div>
+          ) : visibleLeaderboard.length && leaderboardType === "SURVIVOR" ? (
+            <>
+              <div className="survivorLegend" aria-label="Survivor result colours">
+                <span><i className="advanced" />Advanced</span>
+                <span><i className="eliminated" />Eliminated</span>
+                <span><i className="pending" />Pending</span>
+              </div>
+              <div className="survivorGridWrap">
+                <div className="survivorGrid survivorGridHeader">
+                  <div>Entry</div>
+                  {Array.from({ length: 18 }, (_, index) => (
+                    <div key={index}>W{index + 1}</div>
+                  ))}
+                </div>
+                {visibleLeaderboard.map((row) => {
+                  const picksByWeek = new Map(
+                    (row.picks || []).map((pick) => [pick.week, pick]),
+                  );
+                  return (
+                    <div className="survivorGrid survivorGridRow" key={row.entryId}>
+                      <div className="survivorEntryCell">
+                        <b>#{row.rank}</b>
+                        <span>
+                          <strong>{row.name}</strong>
+                          <small className={row.alive ? "alive" : "out"}>
+                            {row.status}
+                          </small>
+                        </span>
+                      </div>
+                      {Array.from({ length: 18 }, (_, index) => {
+                        const week = index + 1;
+                        const pick = picksByWeek.get(week);
+                        const resultClass =
+                          pick?.result === "WIN"
+                            ? "advanced"
+                            : pick?.result === "LOSS"
+                              ? "eliminated"
+                              : pick?.teamCode
+                                ? "pending"
+                                : "empty";
+                        return (
+                          <div
+                            className={`survivorWeekCell ${resultClass}`}
+                            key={week}
+                            title={
+                              pick && !pick.locked
+                                ? "Pick hidden until the game locks"
+                                : pick?.teamCode || `No Week ${week} pick`
+                            }
+                          >
+                            {pick && !pick.locked ? "HIDDEN" : pick?.teamCode || "—"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           ) : visibleLeaderboard.length ? (
             visibleLeaderboard.map((row) => (
               <div className="leaderRow" key={row.entryId}>
