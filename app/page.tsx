@@ -127,6 +127,7 @@ export default function Home() {
     email: string;
     displayName: string;
     username: string;
+    isCommissioner: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -149,6 +150,7 @@ export default function Home() {
           email: b.user?.email || "",
           displayName: b.profile?.display_name || "",
           username: b.profile?.username || "",
+          isCommissioner: Boolean(b.profile?.is_commissioner),
         });
         const mappedPools: Pool[] = (b.pools || []).map((p: any) => ({
           id: p.id,
@@ -560,9 +562,20 @@ export default function Home() {
               type="button"
               className={role === "COMMISSIONER" ? "active commissioner" : ""}
               aria-pressed={role === "COMMISSIONER"}
-              onClick={() => setRole("COMMISSIONER")}
+              onClick={() => {
+                if (!supabaseConfigured || account?.isCommissioner)
+                  setRole("COMMISSIONER");
+                else window.location.href = "/beta";
+              }}
+              title={
+                account && !account.isCommissioner
+                  ? "Commissioner activation required"
+                  : undefined
+              }
             >
-              Commissioner
+              {account && !account.isCommissioner
+                ? "Commissioner Setup"
+                : "Commissioner"}
             </button>
           </div>
         </div>
