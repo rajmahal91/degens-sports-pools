@@ -26,6 +26,7 @@ export default function Prizes() {
   const [prizes, setPrizes] = useState<Prize[]>([]),
     [pools, setPools] = useState<Pool[]>([]),
     [manageable, setManageable] = useState<string[]>([]),
+    [deletable, setDeletable] = useState<string[]>([]),
     [loading, setLoading] = useState(true),
     [message, setMessage] = useState("");
   const [manualDrafts, setManualDrafts] = useState<Record<string, string>>({});
@@ -58,6 +59,7 @@ export default function Prizes() {
     setPrizes(j.prizes || []);
     setPools(j.pools || []);
     setManageable(j.canManagePoolIds || []);
+    setDeletable(j.canDeletePoolIds || []);
     if (!poolId) setPoolId((j.canManagePoolIds || [])[0] || "");
   }
   useEffect(() => {
@@ -377,14 +379,16 @@ export default function Prizes() {
                             ? "Saving…"
                             : "Use League Entries"}
                         </button>
-                        <button
-                          type="button"
-                          className="deletePrizeButton"
-                          disabled={deleting === p.id}
-                          onClick={() => deletePrize(p)}
-                        >
-                          {deleting === p.id ? "Deleting…" : "Delete Prize"}
-                        </button>
+                        {deletable.includes(p.pool_id) && (
+                          <button
+                            type="button"
+                            className="deletePrizeButton"
+                            disabled={deleting === p.id}
+                            onClick={() => deletePrize(p)}
+                          >
+                            {deleting === p.id ? "Deleting…" : "Delete Prize"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -426,7 +430,7 @@ export default function Prizes() {
                       <small>
                         {d.overridden_at ? "AUDITED OVERRIDE" : "VERIFIED DRAW"}
                       </small>
-                      {manageable.includes(p.pool_id) && (
+                      {deletable.includes(p.pool_id) && (
                         <select
                           value={
                             d.winner_snapshot_id || d.winner_entry_id || ""
