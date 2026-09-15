@@ -95,14 +95,13 @@ class ESPNProvider implements NFLProvider {
     const response=await fetch(url,{cache:'no-store'});
     if(!response.ok)throw new Error(`ESPN score sync failed (${response.status}).`);
     const payload=await response.json();
-    const sampleOdds=payload.events?.[0]?.competitions?.[0]?.odds?.[0];
-    console.info('[nfl/espn] scoreboard received',{season,week,events:Array.isArray(payload.events)?payload.events.length:0,markets:(payload.events||[]).filter((event:any)=>event.competitions?.[0]?.odds?.length).length,oddsKeys:sampleOdds?Object.keys(sampleOdds):[],moneyline:sampleOdds?.moneyline?JSON.stringify(sampleOdds.moneyline):null});
+    console.info('[nfl/espn] scoreboard received',{season,week,events:Array.isArray(payload.events)?payload.events.length:0,markets:(payload.events||[]).filter((event:any)=>event.competitions?.[0]?.odds?.length).length});
     return (payload.events||[]).map((event:any)=>{
       const competition=event.competitions?.[0];
       const home=competition?.competitors?.find((team:any)=>team.homeAway==='home');
       const away=competition?.competitors?.find((team:any)=>team.homeAway==='away');
-      const odds=competition?.odds?.find((row:any)=>row?.awayTeamOdds?.moneyLine&&row?.homeTeamOdds?.moneyLine);
-      const market=noVigProbabilities(odds?.awayTeamOdds?.moneyLine,odds?.homeTeamOdds?.moneyLine);
+      const odds=competition?.odds?.find((row:any)=>(row?.awayTeamOdds?.moneyLine&&row?.homeTeamOdds?.moneyLine)||(row?.moneyline?.away?.close?.odds&&row?.moneyline?.home?.close?.odds));
+      const market=noVigProbabilities(odds?.awayTeamOdds?.moneyLine??odds?.moneyline?.away?.close?.odds,odds?.homeTeamOdds?.moneyLine??odds?.moneyline?.home?.close?.odds);
       return {id:String(event.id),season,week,seasonType,awayTeamCode:String(away?.team?.abbreviation||''),homeTeamCode:String(home?.team?.abbreviation||''),startsAt:new Date(event.date).toISOString(),status:normalizeStatus(event.status?.type?.description,event.status?.type?.completed),awayScore:away?.score==null?null:Number(away.score),homeScore:home?.score==null?null:Number(home.score),awayWinProbability:market?.away??null,homeWinProbability:market?.home??null,marketProvider:market?String(odds?.provider?.name||'Market'):null};
     }).filter((game:any)=>game.id&&game.awayTeamCode&&game.homeTeamCode);
   }
