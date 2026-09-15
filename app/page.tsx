@@ -569,12 +569,12 @@ export default function Home() {
               }}
               title={
                 account && !account.isCommissioner
-                  ? "Commissioner activation required"
+                  ? "Enable Commissioner Mode to run your own leagues"
                   : undefined
               }
             >
               {account && !account.isCommissioner
-                ? "Commissioner Setup"
+                ? "Become Commissioner"
                 : "Commissioner"}
             </button>
           </div>
