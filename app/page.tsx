@@ -62,6 +62,7 @@ export default function Home() {
   const [games, setGames] = useState(seedWeek1Games);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [pickWeek, setPickWeek] = useState(1);
+  const [nowMs,setNowMs]=useState(()=>Date.now());
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(supabaseConfigured);
   const [signedOut, setSignedOut] = useState(false);
@@ -199,6 +200,34 @@ export default function Home() {
       })
       .finally(() => setLoading(false));
   }, [supabaseConfigured]);
+
+  useEffect(()=>{
+    const timer=window.setInterval(()=>setNowMs(Date.now()),30000);
+    return()=>window.clearInterval(timer);
+  },[]);
+
+  useEffect(()=>{
+    if(!connected||!games.length)return;
+    const season=Number(games.find(game=>game.week===currentWeek)?.kickoff.slice(0,4)||new Date().getUTCFullYear());
+    let stopped=false;
+    const refresh=async()=>{
+      try{
+        const response=await fetch(`/api/nfl/live?season=${season}&week=${currentWeek}`,{cache:'no-store'});
+        if(!response.ok||stopped)return;
+        const body=await response.json();
+        const updated=(body.games||[]).map((g:any)=>({id:g.id,week:g.week,away:g.away_team,awayCode:g.away_team,home:g.home_team,homeCode:g.home_team,kickoff:g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
+        setGames(current=>[...current.filter(game=>game.week!==currentWeek),...updated]);
+        const statuses=new Map((body.entries||[]).map((entry:any)=>[entry.id,entry.entry_status]));
+        setEntries(current=>current.map(entry=>statuses.has(entry.id)?{...entry,status:statuses.get(entry.id) as Entry['status']}:entry));
+        const results=new Map((body.picks||[]).map((pick:any)=>[`${pick.entry_id}-${pick.week}`,pick.result||'PENDING']));
+        setSurvivorPicks(current=>current.map(pick=>results.has(`${pick.entryId}-${pick.week}`)?{...pick,result:results.get(`${pick.entryId}-${pick.week}`) as SurvivorPick['result']}:pick));
+        setNowMs(Date.now());
+      }catch{/* Keep the last verified scoreboard if refresh is temporarily unavailable. */}
+    };
+    refresh();
+    const timer=window.setInterval(refresh,60000);
+    return()=>{stopped=true;window.clearInterval(timer);};
+  },[connected,currentWeek]);
 
   useEffect(() => {
     if (tab !== "leaderboard" || !supabaseConfigured) return;
@@ -793,11 +822,14 @@ export default function Home() {
               )}
               {pickWeekGames.map((g) => (
                 <div className="gameCard" key={g.id}>
-                  <div className="gameTime">{when(g.kickoff)}</div>
+                  <div className="gameTime">
+                    <span>{when(g.kickoff)}</span>
+                    <b>{g.status === "FINAL" ? "FINAL" : g.status === "LIVE" ? "LIVE" : "SCHEDULED"}</b>
+                  </div>
                   <div className="matchup">
                     <button
                       disabled={
-                        usedSurvivorTeams.has(g.awayCode)
+                        g.status !== "SCHEDULED" || new Date(g.kickoff).getTime() <= nowMs || usedSurvivorTeams.has(g.awayCode)
                       }
                       className={
                         survivorChoice?.teamCode === g.awayCode
@@ -808,11 +840,12 @@ export default function Home() {
                     >
                       <b>{g.awayCode}</b>
                       <span>{g.away}</span>
+                      {g.awayScore !== undefined && <strong>{g.awayScore}</strong>}
                     </button>
                     <span className="at">@</span>
                     <button
                       disabled={
-                        usedSurvivorTeams.has(g.homeCode)
+                        g.status !== "SCHEDULED" || new Date(g.kickoff).getTime() <= nowMs || usedSurvivorTeams.has(g.homeCode)
                       }
                       className={
                         survivorChoice?.teamCode === g.homeCode
@@ -823,6 +856,7 @@ export default function Home() {
                     >
                       <b>{g.homeCode}</b>
                       <span>{g.home}</span>
+                      {g.homeScore !== undefined && <strong>{g.homeScore}</strong>}
                     </button>
                   </div>
                 </div>
