@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getNFLScoreProvider } from '@/lib/sports/provider';
+import { calculateFullPprPoints } from '@/lib/sports/fantasy-scoring';
 
 type SeasonType = 'REG' | 'POST';
 
@@ -25,13 +26,14 @@ export async function syncNFLWeek(season:number,week:number,seasonType:SeasonTyp
   const admin=client||createAdminClient();
   const provider=getNFLScoreProvider();
   const games=await provider.gamesByWeek(String(season),week,seasonType);
+  const playoffLabels:Record<number,string>={1:'Wild Card',2:'Divisional',3:'Conference Championship',4:'Super Bowl'};
   const rows=games.map(game=>({
-    provider_game_id:game.id,sport:'NFL',season:Number(game.season),week:game.week,round_label:`Week ${game.week}`,
+    provider_game_id:game.id,sport:'NFL',season:Number(game.season),week:game.week,round_label:seasonType==='POST'?(playoffLabels[game.week]||`Playoff Round ${game.week}`):`Week ${game.week}`,
     away_team:game.awayTeamCode,home_team:game.homeTeamCode,kickoff_at:game.startsAt,status:game.status,
     away_score:game.awayScore??null,home_score:game.homeScore??null,
     winner_team:game.status==='FINAL'&&game.awayScore!==game.homeScore?(Number(game.awayScore)>Number(game.homeScore)?game.awayTeamCode:game.homeTeamCode):null,
     raw:{
-      provider:provider.name,
+      provider:provider.name,seasonType,
       market:game.awayWinProbability!=null&&game.homeWinProbability!=null?{
         awayWinProbability:game.awayWinProbability,
         homeWinProbability:game.homeWinProbability,
@@ -113,8 +115,43 @@ export async function gradeNFLWeek(season:number,week:number,now=new Date(),clie
   return {season,week,finalGames:finalGames.length,pickemGraded,survivorGraded,eliminated,missed};
 }
 
+export async function gradeNFLFantasyRound(season:number,roundOrder:number,client?:any){
+  const admin=client||createAdminClient();
+  const provider=getNFLScoreProvider();
+  const stats=await provider.playerStatsByWeek(String(season),roundOrder,'POST');
+  const {data:pools,error:poolsError}=await admin.from('pools').select('id,scoring_settings').eq('sport','NFL').eq('season',season).eq('pool_type','PLAYOFF_FANTASY').eq('is_active',true);
+  if(poolsError)throw poolsError;
+  let graded=0;
+  const statByProviderId=new Map<string,any>();
+  for(const stat of stats){
+    const current=statByProviderId.get(stat.athleteId)||{...stat,passingYards:0,passingTouchdowns:0,interceptions:0,rushingYards:0,rushingTouchdowns:0,receptions:0,receivingYards:0,receivingTouchdowns:0,fumblesLost:0,twoPointConversions:0};
+    for(const key of ['passingYards','passingTouchdowns','interceptions','rushingYards','rushingTouchdowns','receptions','receivingYards','receivingTouchdowns','fumblesLost','twoPointConversions']) current[key]+=Number((stat as any)[key]||0);
+    statByProviderId.set(stat.athleteId,current);
+  }
+  for(const pool of pools||[]){
+    const {data:round}=await admin.from('rounds').select('id').eq('pool_id',pool.id).eq('round_order',roundOrder).maybeSingle();
+    if(!round)continue;
+    const {data:entries}=await admin.from('entries').select('id').eq('pool_id',pool.id);
+    const entryIds=(entries||[]).map((entry:any)=>entry.id);
+    if(!entryIds.length)continue;
+    const {data:picks}=await admin.from('playoff_fantasy_picks').select('id,athlete_id').eq('round_id',round.id).in('entry_id',entryIds);
+    const athleteIds=[...new Set((picks||[]).map((pick:any)=>pick.athlete_id))];
+    const {data:athletes}=athleteIds.length?await admin.from('athletes').select('id,provider_athlete_id').in('id',athleteIds):{data:[]};
+    const providerById=new Map((athletes||[]).map((athlete:any)=>[athlete.id,athlete.provider_athlete_id]));
+    for(const pick of picks||[]){
+      const stat=statByProviderId.get(String(providerById.get(pick.athlete_id)||''));
+      if(!stat)continue;
+      const points=calculateFullPprPoints(stat,pool.scoring_settings);
+      const {error}=await admin.from('playoff_fantasy_picks').update({fantasy_points:points}).eq('id',pick.id);
+      if(error)throw error;
+      graded++;
+    }
+  }
+  return {roundOrder,stats:stats.length,fantasyGraded:graded};
+}
+
 export async function syncAndGradeNFLWeek(season:number,week:number,seasonType:SeasonType='REG',client?:any,poolId?:string){
   const sync=await syncNFLWeek(season,week,seasonType,client);
-  const grading=await gradeNFLWeek(season,week,new Date(),client,poolId);
+  const grading=seasonType==='POST'?await gradeNFLFantasyRound(season,week,client):await gradeNFLWeek(season,week,new Date(),client,poolId);
   return {...sync,...grading};
 }
