@@ -14,7 +14,7 @@ type Prize = {
   eligibility: any;
   prize_draws: any[];
 };
-type Pool = { id: string; name: string };
+type Pool = { id: string; name: string; sport?: string; pool_type?: string };
 const money = (c: number | null) =>
   c == null
     ? "Value TBA"
@@ -204,6 +204,8 @@ export default function Prizes() {
       (p) => !p.prize_draws?.some((d) => d.drawn_at),
     ),
     past = prizes.filter((p) => p.prize_draws?.some((d) => d.drawn_at));
+  const manageablePools = pools.filter((p) => manageable.includes(p.id));
+  const selectedPool = manageablePools.find((p) => p.id === poolId);
   return (
     <main className="prizePage">
       <header className="prizeTop">
@@ -232,21 +234,23 @@ export default function Prizes() {
         )}
         {!loading && commissionerView && manageable.length > 0 && (
           <form className="wideCard leagueForm" onSubmit={create}>
-            <h2>Add Weekly Prize</h2>
+            <h2>
+              {selectedPool
+                ? `Add Prize to ${selectedPool.name}`
+                : "Add Weekly Prize"}
+            </h2>
             <label className="fieldLabel">
-              League
+              Pool / League
               <select
                 className="textInput"
                 value={poolId}
                 onChange={(e) => setPoolId(e.target.value)}
               >
-                {pools
-                  .filter((p) => manageable.includes(p.id))
-                  .map((p) => (
+                {manageablePools.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
-                  ))}
+                ))}
               </select>
             </label>
             <label className="fieldLabel">
@@ -294,8 +298,11 @@ export default function Prizes() {
                 onChange={(e) => setDrawAt(e.target.value)}
               />
             </label>
-            <button className="primary" disabled={saving}>
-              {saving ? "Adding…" : "Add Prize"}
+            <div className="notice">
+              This prize will be added to: <strong>{selectedPool?.name || "Select a pool"}</strong>
+            </div>
+            <button className="primary" disabled={saving || !poolId}>
+              {saving ? "Adding…" : poolId ? "Add Prize" : "Select a pool first"}
             </button>
           </form>
         )}
@@ -337,6 +344,9 @@ export default function Prizes() {
                 <article className="prizeCard" key={p.id}>
                   <div className="prizeSport">
                     🏆 {p.week ? `WEEK ${p.week}` : "SPECIAL DRAW"}
+                  </div>
+                  <div className="prizePoolLabel">
+                    POOL · {pools.find((pool) => pool.id === p.pool_id)?.name || "Unknown pool"}
                   </div>
                   <h3>{p.title}</h3>
                   <b className="prizeValue">{money(p.value_cents)}</b>
@@ -446,6 +456,9 @@ export default function Prizes() {
                         {p.week ? `Week ${p.week} · ` : ""}
                         {p.title}
                       </strong>
+                      <small>
+                        Pool: {pools.find((pool) => pool.id === p.pool_id)?.name || "Unknown pool"}
+                      </small>
                       <span>
                         {d.winner_name || winner?.name || "Winner recorded"} ·{" "}
                         {money(p.value_cents)}
