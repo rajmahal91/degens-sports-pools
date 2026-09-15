@@ -299,6 +299,19 @@ export default function Prizes() {
             </button>
           </form>
         )}
+        {!loading && commissionerView && manageable.length === 0 && (
+          <div className="wideCard poolEmptyState">
+            <strong>Create your first league to manage prizes</strong>
+            <span>
+              Commissioner access is enabled, but this account does not own a
+              league yet. Create one first, then return here to add weekly
+              prizes and manage draws.
+            </span>
+            <a className="primary" href="/leagues/new">
+              Create League
+            </a>
+          </div>
+        )}
         {message && <div className="notice">{message}</div>}
         {loading ? (
           <div className="notice">Loading prizes…</div>
