@@ -1136,32 +1136,60 @@ export default function Home() {
             </div>
           )}
           {leaderboardType === "PICKEM" && leaderboardPools.length > 0 && (
-            <div className="weekTabs" aria-label="Choose Pick'em standings period">
+            <div
+              className="leaderboardPeriodPicker"
+              aria-label="Choose Pick'em standings period"
+            >
               <button
                 type="button"
-                className={leaderboardWeek === null ? "weekActive" : ""}
+                className="periodArrow"
+                aria-label="Previous standings period"
+                disabled={leaderboardWeek === null}
                 onClick={() => {
-                  setLeaderboardWeek(null);
+                  setLeaderboardWeek(
+                    leaderboardWeek === 1
+                      ? null
+                      : Math.max(1, (leaderboardWeek ?? 1) - 1),
+                  );
                   setLeaderboardRows([]);
                 }}
               >
-                Season
+                ‹
               </button>
-              {Array.from({ length: 18 }, (_, index) => index + 1).map(
-                (week) => (
-                  <button
-                    type="button"
-                    key={week}
-                    className={`${leaderboardWeek === week ? "weekActive" : ""} ${week === currentWeek ? "weekCurrent" : ""}`}
-                    onClick={() => {
-                      setLeaderboardWeek(week);
-                      setLeaderboardRows([]);
-                    }}
-                  >
-                    Week {week}
-                  </button>
-                ),
-              )}
+              <label>
+                <small>STANDINGS PERIOD</small>
+                <select
+                  value={leaderboardWeek ?? 0}
+                  onChange={(event) => {
+                    const selected = Number(event.target.value);
+                    setLeaderboardWeek(selected === 0 ? null : selected);
+                    setLeaderboardRows([]);
+                  }}
+                >
+                  <option value={0}>Season Total</option>
+                  {Array.from({ length: 18 }, (_, index) => index + 1).map(
+                    (week) => (
+                      <option key={week} value={week}>
+                        Week {week}{week === currentWeek ? " — Current" : ""}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="periodArrow"
+                aria-label="Next standings period"
+                disabled={leaderboardWeek === 18}
+                onClick={() => {
+                  setLeaderboardWeek(
+                    leaderboardWeek === null ? 1 : leaderboardWeek + 1,
+                  );
+                  setLeaderboardRows([]);
+                }}
+              >
+                ›
+              </button>
             </div>
           )}
           {leaderboardLoading ? (
