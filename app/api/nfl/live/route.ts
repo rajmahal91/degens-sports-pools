@@ -15,25 +15,20 @@ export async function GET(request:Request){
     const url=new URL(request.url);
     const season=Number(url.searchParams.get('season'));
     const week=Number(url.searchParams.get('week'));
-    if(!Number.isInteger(season)||season<2020||season>2100||!Number.isInteger(week)||week<1||week>22){
+    const activeWeek=Number(url.searchParams.get('currentWeek')||week);
+    if(!Number.isInteger(season)||season<2020||season>2100||!Number.isInteger(week)||week<1||week>22||!Number.isInteger(activeWeek)||activeWeek<1||activeWeek>22){
       return NextResponse.json({error:'A valid NFL season and week are required.'},{status:400});
     }
-    const weeks=week>1?[week-1,week]:[week];
-    const settled=await Promise.allSettled([
-      week>1?refreshWeek(season,week-1):Promise.resolve(null),
-      refreshWeek(season,week),
-    ]);
-    const [previousResult,currentResult]=settled;
+    const weeks=[...new Set([week,activeWeek,activeWeek>1?activeWeek-1:null].filter((value):value is number=>value!==null))];
+    const settled=await Promise.allSettled(weeks.map(targetWeek=>refreshWeek(season,targetWeek)));
     for(const [index,result] of settled.entries()){
       if(result.status==='rejected')console.error('[api/nfl/live] refresh failed',{
         season,
-        week:index===0&&week>1?week-1:week,
+        week:weeks[index],
         error:result.reason instanceof Error?result.reason.message:String(result.reason),
       });
     }
-    const previous=previousResult.status==='fulfilled'?previousResult.value:null;
-    const current=currentResult.status==='fulfilled'?currentResult.value:null;
-    const sync={previous,current};
+    const sync=Object.fromEntries(weeks.map((targetWeek,index)=>[targetWeek,settled[index].status==='fulfilled'?(settled[index] as PromiseFulfilledResult<unknown>).value:null]));
     const [{data:games,error:gamesError},{data:entries,error:entriesError}]=await Promise.all([
       supabase.from('games').select('*').eq('sport','NFL').eq('season',season).in('week',weeks).order('kickoff_at'),
       supabase.from('entries').select('id,entry_status').eq('user_id',user.id),
