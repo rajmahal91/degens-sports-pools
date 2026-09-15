@@ -7,8 +7,8 @@ export async function POST(request:Request){
  if(!authorized(request)) return NextResponse.json({error:'Unauthorized'},{status:401});
  try{
   const provider=getNFLProvider(); const players=await provider.players(); const supabase=createAdminClient();
-  const rows=players.map(p=>({id:p.athleteId,sport:'NFL',full_name:p.fullName,team_code:p.teamCode,position:p.position,active:p.active}));
-  const {error}=await supabase.from('athletes').upsert(rows,{onConflict:'id'}); if(error) throw error;
+  const rows=players.map(p=>({provider_athlete_id:p.athleteId,sport:'NFL',name:p.fullName,team_code:p.teamCode,position:p.position,active:p.active}));
+  const {error}=await supabase.from('athletes').upsert(rows,{onConflict:'provider_athlete_id'}); if(error) throw error;
   return NextResponse.json({provider:provider.name,synced:rows.length});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Player sync failed'},{status:500})}
 }
