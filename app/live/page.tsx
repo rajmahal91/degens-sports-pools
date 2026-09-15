@@ -44,7 +44,7 @@ export default function LiveDraw() {
       headers.set("authorization", `Bearer ${data.session.access_token}`);
     return fetch(path, { ...init, headers });
   }
-  async function load(forceViewer = viewerMode) {
+  async function load() {
     const r = await api("/api/prizes");
     const j = await r.json();
     if (r.status === 401 && j.error === "UNAUTHENTICATED") {
@@ -62,46 +62,41 @@ export default function LiveDraw() {
     setPrizeId((x) =>
       upcoming.some((p: any) => p.id === x) ? x : upcoming[0]?.id || "",
     );
-    const canHost = (j.canManagePoolIds || []).length > 0 && !forceViewer;
-    setIsHost(canHost);
-    return canHost;
+    return (j.canManagePoolIds || []).length > 0;
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
       explicitViewer = params.get("viewer") === "1",
-      hostRequested = params.get("host") === "1" || !explicitViewer,
-      viewer = explicitViewer;
-    let code = hostRequested
-      ? (params.get("room") || "")
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "")
-          .slice(0, 6)
-      : "";
-    if (hostRequested && !code) {
-      code =
-        localStorage.getItem("degensMeetingCode") ||
-        Array.from(
-          crypto.getRandomValues(new Uint8Array(6)),
-          (x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32],
-        ).join("");
-      localStorage.setItem("degensMeetingCode", code);
-      params.set("room", code);
-      window.history.replaceState(
-        {},
-        "",
-        `${window.location.pathname}?${params}`,
-      );
-    }
-    setMeetingCode(code);
+      previewRequested = explicitViewer && params.get("preview") === "1",
+      requestedRoom = (params.get("room") || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 6);
+    setMeetingCode("");
     setJoinCode("");
-    setViewerMode(viewer);
-    load(viewer)
-      .then((canHost) => {
-        if (hostRequested && !canHost) {
-          setViewerMode(true);
-          setMeetingCode("");
-          window.history.replaceState({}, "", "/live");
+    setViewerMode(explicitViewer);
+    load()
+      .then((canManage) => {
+        const host = Boolean(canManage) && !previewRequested;
+        setIsHost(host);
+        if (host) {
+          const code =
+            requestedRoom ||
+            localStorage.getItem("degensMeetingCode") ||
+            Array.from(
+              crypto.getRandomValues(new Uint8Array(6)),
+              (x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32],
+            ).join("");
+          localStorage.setItem("degensMeetingCode", code);
+          setMeetingCode(code);
+          setViewerMode(false);
+          window.history.replaceState({}, "", `/live?host=1&room=${code}`);
+          return;
         }
+        setViewerMode(true);
+        setMeetingCode(previewRequested ? requestedRoom : "");
+        if (!previewRequested)
+          window.history.replaceState({}, "", "/live?viewer=1");
       })
       .finally(() => setRoleReady(true));
   }, []);
@@ -214,7 +209,9 @@ export default function LiveDraw() {
           <b>🔴 LIVE DRAW ROOM</b>
           <span>{viewerMode ? "Viewer mode" : "Commissioner meeting"}</span>
         </div>
-        <a href="/prizes">Prize Centre</a>
+        <a href={isHost ? "/prizes?mode=commissioner" : "/prizes"}>
+          Prize Centre
+        </a>
       </header>
       {isHost && meetingCode && (
         <section className="meetingInvite">
@@ -234,7 +231,10 @@ export default function LiveDraw() {
             >
               {copied ? "Invite Link Copied ✓" : "Copy Invite Link"}
             </button>
-            <a href="/live?viewer=1" target="_blank">
+            <a
+              href={`/live?viewer=1&preview=1&room=${meetingCode}`}
+              target="_blank"
+            >
               Preview
             </a>
             <button type="button" onClick={newMeeting}>
@@ -243,7 +243,7 @@ export default function LiveDraw() {
           </div>
         </section>
       )}
-      {viewerMode && !meetingCode && (
+      {roleReady && viewerMode && !meetingCode && (
         <section className="joinMeetingCard">
           <span>JOIN LIVE DRAW</span>
           <h1>Enter meeting code</h1>
