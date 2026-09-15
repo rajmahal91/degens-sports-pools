@@ -62,7 +62,7 @@ export default function LiveDraw() {
     setPrizeId((x) =>
       upcoming.some((p: any) => p.id === x) ? x : upcoming[0]?.id || "",
     );
-    return (j.canManagePoolIds || []).length > 0;
+    return Boolean(j.canHost);
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
@@ -76,8 +76,8 @@ export default function LiveDraw() {
     setJoinCode("");
     setViewerMode(explicitViewer);
     load()
-      .then((canManage) => {
-        const host = Boolean(canManage) && !previewRequested;
+      .then((canHost) => {
+        const host = Boolean(canHost) && !previewRequested;
         setIsHost(host);
         if (host) {
           const code =
