@@ -12,6 +12,7 @@ export interface Pool {
   status: 'OPEN' | 'ACTIVE' | 'COMPLETE';
   season: string;
   registrationClosesAt?: string;
+  deadlineMode?: 'GAME_KICKOFF' | 'SUNDAY_10AM_PT';
 }
 
 export interface Entry {
