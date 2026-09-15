@@ -46,13 +46,26 @@ async function creatorPoolIds(supabase: SupabaseClient, userId: string) {
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    const { data: visiblePools } = await supabase
-      .from("pools")
-      .select("id,name,sport,pool_type")
-      .order("created_at");
+    const [{ data: visiblePools }, { data: profile }] = await Promise.all([
+      supabase
+        .from("pools")
+        .select("id,name,sport,pool_type")
+        .order("created_at"),
+      supabase
+        .from("profiles")
+        .select("is_commissioner")
+        .eq("id", user.id)
+        .single(),
+    ]);
+    const canHost = Boolean(profile?.is_commissioner);
     const poolIds = (visiblePools || []).map((p) => p.id);
     if (!poolIds.length)
-      return NextResponse.json({ prizes: [], pools: [], canManagePoolIds: [] });
+      return NextResponse.json({
+        prizes: [],
+        pools: [],
+        canManagePoolIds: [],
+        canHost,
+      });
     const [canManage, canDelete] = await Promise.all([
       manageablePoolIds(supabase, user.id),
       creatorPoolIds(supabase, user.id),
@@ -107,11 +120,18 @@ export async function GET() {
         eligible_entries: canManage.has(prize.pool_id) ? displayed : undefined,
       });
     }
+    console.info("[api/prizes] loaded", {
+      userId: user.id,
+      canHost,
+      visiblePoolCount: poolIds.length,
+      manageablePoolCount: canManage.size,
+    });
     return NextResponse.json({
       prizes: result,
       pools: visiblePools || [],
       canManagePoolIds: [...canManage],
       canDeletePoolIds: [...canDelete],
+      canHost,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load prizes.";
