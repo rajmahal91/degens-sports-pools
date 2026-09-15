@@ -725,6 +725,63 @@ p {
   background: #233019;
   color: var(--text);
 }
+.leaderboardPeriodPicker {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.leaderboardPeriodPicker label {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 7px 14px;
+  border: 1px solid #39465a;
+  border-radius: 12px;
+  background: var(--panel2);
+}
+.leaderboardPeriodPicker label small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+.leaderboardPeriodPicker select {
+  width: 100%;
+  min-height: 27px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+}
+.leaderboardPeriodPicker select option {
+  background: var(--panel2);
+  color: var(--text);
+}
+.leaderboardPeriodPicker .periodArrow {
+  min-width: 48px;
+  min-height: 52px;
+  border: 1px solid #39465a;
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--accent);
+  font-size: 30px;
+  line-height: 1;
+  touch-action: manipulation;
+}
+.leaderboardPeriodPicker .periodArrow:disabled {
+  color: var(--muted);
+  opacity: 0.35;
+}
 .entryTabs {
   display: flex;
   gap: 8px;
