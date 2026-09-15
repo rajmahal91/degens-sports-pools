@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const provider = getNFLProvider();
     const games = await provider.gamesByWeek(String(season), Number(week), seasonType);
     const supabase = createAdminClient();
+    const playoffLabels: Record<number, string> = { 1: 'Wild Card', 2: 'Divisional', 3: 'Conference Championship', 4: 'Super Bowl' };
     const rows = games.map(g => ({
       provider_game_id: g.id,
       sport: 'NFL', season: Number(g.season), week: g.week, round_label: `Week ${g.week}`,
@@ -23,8 +24,11 @@ export async function POST(request: Request) {
       kickoff_at: g.startsAt, status: g.status,
       away_score: g.awayScore ?? null, home_score: g.homeScore ?? null,
       winner_team: g.status==='FINAL'&&g.awayScore!==g.homeScore?(Number(g.awayScore)>Number(g.homeScore)?g.awayTeamCode:g.homeTeamCode):null,
-      raw: { provider: provider.name }, updated_at: new Date().toISOString(),
+      raw: { provider: provider.name, seasonType, playoffRound: seasonType === 'POST' ? playoffLabels[g.week] || `Playoff Round ${g.week}` : null }, updated_at: new Date().toISOString(),
     }));
+    rows.forEach((row:any) => {
+      if (seasonType === 'POST') row.round_label = playoffLabels[row.week] || `Playoff Round ${row.week}`;
+    });
     const { error } = await supabase.from('games').upsert(rows, { onConflict: 'provider_game_id' });
     if (error) throw error;
     return NextResponse.json({ provider: provider.name, synced: rows.length, games: rows });
