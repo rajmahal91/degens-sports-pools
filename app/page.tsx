@@ -97,6 +97,9 @@ export default function Home() {
   const [entries, setEntries] = useState<Entry[]>(
     supabaseConfigured ? [] : seedEntries,
   );
+  const [manageablePoolIds, setManageablePoolIds] = useState<string[]>(
+    supabaseConfigured ? [] : seedPools.map((pool) => pool.id),
+  );
   const [survivorPicks, setSurvivorPicks] = useState<SurvivorPick[]>([]);
   const [pendingSurvivor, setPendingSurvivor] = useState<{
     gameId: string;
@@ -218,6 +221,7 @@ export default function Home() {
           }),
         );
         setPools(mappedPools);
+        setManageablePoolIds(b.manageablePoolIds || []);
         setEntries(mappedEntries);
         if (mappedGames.length) setGames(mappedGames);
         setSurvivorPicks(mappedSurvivor);
@@ -682,7 +686,7 @@ export default function Home() {
                 <span>Demo entries</span>
               </div>
               <div>
-                <b>{pools.length}</b>
+                <b>{manageablePoolIds.length}</b>
                 <span>Managed pools</span>
               </div>
               <div>
@@ -787,7 +791,7 @@ export default function Home() {
                           View & Make Picks
                         </button>
                       )}
-                      {role === "COMMISSIONER" && (
+                      {role === "COMMISSIONER" && manageablePoolIds.includes(pool.id) && (
                         <a
                           className="secondary poolSecondary"
                           href={`/leagues/${pool.id}`}
@@ -1331,11 +1335,37 @@ export default function Home() {
               </div>
               <h2>Commissioner Actions</h2>
               <div className="actionGrid">
-                <button>Send Pick Reminder</button>
-                <button>Lock Week</button>
+                <a href="/leagues/new">Create League</a>
                 <a href="/prizes?mode=commissioner">Prize Centre</a>
                 <a href="/live?host=1">Go Live</a>
               </div>
+              <h2>Manage Your Leagues</h2>
+              {manageablePoolIds.length === 0 ? (
+                <div className="wideCard poolEmptyState">
+                  <strong>You have not created a league yet</strong>
+                  <span>Create your first league to invite players and add prizes.</span>
+                  <a className="primary" href="/leagues/new">Create League</a>
+                </div>
+              ) : (
+                <div className="poolHubList">
+                  {pools
+                    .filter((pool) => manageablePoolIds.includes(pool.id))
+                    .map((pool) => (
+                      <article className="poolHubCard" key={pool.id}>
+                        <div className="poolHubTop">
+                          <div className="grow">
+                            <strong>{pool.name}</strong>
+                            <span>{pool.season} · {pool.type.replaceAll("_", " ")}</span>
+                          </div>
+                        </div>
+                        <div className="poolHubActions">
+                          <a className="primary" href={`/leagues/${pool.id}`}>League Settings</a>
+                          <a className="secondary poolSecondary" href={`/prizes?mode=commissioner&pool=${pool.id}`}>Manage Prizes</a>
+                        </div>
+                      </article>
+                    ))}
+                </div>
+              )}
             </>
           )}
         </section>
