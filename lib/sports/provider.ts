@@ -95,7 +95,8 @@ class ESPNProvider implements NFLProvider {
     const response=await fetch(url,{cache:'no-store'});
     if(!response.ok)throw new Error(`ESPN score sync failed (${response.status}).`);
     const payload=await response.json();
-    console.info('[nfl/espn] scoreboard received',{season,week,events:Array.isArray(payload.events)?payload.events.length:0,markets:(payload.events||[]).filter((event:any)=>event.competitions?.[0]?.odds?.length).length});
+    const sampleOdds=payload.events?.[0]?.competitions?.[0]?.odds?.[0];
+    console.info('[nfl/espn] scoreboard received',{season,week,events:Array.isArray(payload.events)?payload.events.length:0,markets:(payload.events||[]).filter((event:any)=>event.competitions?.[0]?.odds?.length).length,oddsKeys:sampleOdds?Object.keys(sampleOdds):[],awayOddsKeys:sampleOdds?.awayTeamOdds?Object.keys(sampleOdds.awayTeamOdds):[],homeOddsKeys:sampleOdds?.homeTeamOdds?Object.keys(sampleOdds.homeTeamOdds):[]});
     return (payload.events||[]).map((event:any)=>{
       const competition=event.competitions?.[0];
       const home=competition?.competitors?.find((team:any)=>team.homeAway==='home');
