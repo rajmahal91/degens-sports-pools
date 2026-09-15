@@ -148,6 +148,9 @@ export default function Home() {
           status: g.status,
           awayScore: g.away_score ?? undefined,
           homeScore: g.home_score ?? undefined,
+          awayWinProbability: g.raw?.market?.awayWinProbability ?? undefined,
+          homeWinProbability: g.raw?.market?.homeWinProbability ?? undefined,
+          marketProvider: g.raw?.market?.provider ?? undefined,
         }));
         const gameById = new Map(mappedGames.map((g: any) => [g.id, g]));
         const mappedSurvivor: SurvivorPick[] = (b.survivor || []).map(
@@ -219,7 +222,7 @@ export default function Home() {
         const response=await fetch(`/api/nfl/live?season=${season}&week=${currentWeek}`,{cache:'no-store'});
         if(!response.ok||stopped)return;
         const body=await response.json();
-        const updated=(body.games||[]).map((g:any)=>({id:g.id,week:g.week,away:g.away_team,awayCode:g.away_team,home:g.home_team,homeCode:g.home_team,kickoff:g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined}));
+        const updated=(body.games||[]).map((g:any)=>({id:g.id,week:g.week,away:g.away_team,awayCode:g.away_team,home:g.home_team,homeCode:g.home_team,kickoff:g.kickoff_at,status:g.status,awayScore:g.away_score??undefined,homeScore:g.home_score??undefined,awayWinProbability:g.raw?.market?.awayWinProbability??undefined,homeWinProbability:g.raw?.market?.homeWinProbability??undefined,marketProvider:g.raw?.market?.provider??undefined}));
         const refreshedWeeks=new Set<number>(updated.map((game:{week:number})=>game.week));
         setGames(current=>[...current.filter(game=>!refreshedWeeks.has(game.week)),...updated]);
         const statuses=new Map((body.entries||[]).map((entry:any)=>[entry.id,entry.entry_status]));
@@ -845,6 +848,7 @@ export default function Home() {
                     >
                       <b>{g.awayCode}</b>
                       <span>{g.away}</span>
+                      {g.awayWinProbability !== undefined && <em className="marketProbability">Market {Math.round(g.awayWinProbability*100)}%</em>}
                       {g.awayScore !== undefined && <strong>{g.awayScore}</strong>}
                     </button>
                     <span className="at">@</span>
@@ -861,6 +865,7 @@ export default function Home() {
                     >
                       <b>{g.homeCode}</b>
                       <span>{g.home}</span>
+                      {g.homeWinProbability !== undefined && <em className="marketProbability">Market {Math.round(g.homeWinProbability*100)}%</em>}
                       {g.homeScore !== undefined && <strong>{g.homeScore}</strong>}
                     </button>
                   </div>
