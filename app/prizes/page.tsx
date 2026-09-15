@@ -61,7 +61,13 @@ export default function Prizes() {
     setPools(j.pools || []);
     setManageable(j.canManagePoolIds || []);
     setDeletable(j.canDeletePoolIds || []);
-    if (!poolId) setPoolId((j.canManagePoolIds || [])[0] || "");
+    const requestedPoolId = new URLSearchParams(window.location.search).get("pool");
+    setPoolId((current) =>
+      current ||
+      (requestedPoolId && (j.canManagePoolIds || []).includes(requestedPoolId)
+        ? requestedPoolId
+        : (j.canManagePoolIds || [])[0] || ""),
+    );
   }
   useEffect(() => {
     setCommissionerView(
