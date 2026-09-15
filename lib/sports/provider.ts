@@ -14,6 +14,19 @@ function normalizeStatus(status?: string, isOver?: boolean): ProviderNFLGame['st
   return 'SCHEDULED';
 }
 
+function impliedProbability(moneyline:unknown){
+  const line=Number(moneyline);
+  if(!Number.isFinite(line)||line===0)return null;
+  return line<0?(-line)/((-line)+100):100/(line+100);
+}
+
+function noVigProbabilities(awayMoneyline:unknown,homeMoneyline:unknown){
+  const away=impliedProbability(awayMoneyline);
+  const home=impliedProbability(homeMoneyline);
+  if(away===null||home===null||away+home===0)return null;
+  return {away:away/(away+home),home:home/(away+home)};
+}
+
 class SportsDataIOProvider implements NFLProvider {
   name = 'sportsdataio';
   private key = process.env.SPORTSDATAIO_API_KEY || '';
@@ -27,11 +40,15 @@ class SportsDataIOProvider implements NFLProvider {
   async gamesByWeek(season: string, week: number, seasonType: 'REG' | 'POST' = 'REG') {
     const seasonParam = seasonType === 'POST' ? `${season}POST` : season;
     const rows = await this.get(`/scores/json/ScoresByWeek/${seasonParam}/${week}`);
-    return (rows as any[]).map(g => ({
-      id: String(g.GameKey || g.ScoreID || g.GameID), season, week: Number(g.Week ?? week), seasonType,
-      awayTeamCode: String(g.AwayTeam), homeTeamCode: String(g.HomeTeam), startsAt: new Date(g.DateTime || g.Date).toISOString(),
-      status: normalizeStatus(g.Status, g.IsOver), awayScore: g.AwayScore ?? null, homeScore: g.HomeScore ?? null,
-    }));
+    return (rows as any[]).map(g => {
+      const market=noVigProbabilities(g.AwayTeamMoneyLine,g.HomeTeamMoneyLine);
+      return {
+        id: String(g.GameKey || g.ScoreID || g.GameID), season, week: Number(g.Week ?? week), seasonType,
+        awayTeamCode: String(g.AwayTeam), homeTeamCode: String(g.HomeTeam), startsAt: new Date(g.DateTime || g.Date).toISOString(),
+        status: normalizeStatus(g.Status, g.IsOver), awayScore: g.AwayScore ?? null, homeScore: g.HomeScore ?? null,
+        awayWinProbability:market?.away??null,homeWinProbability:market?.home??null,marketProvider:market?'SportsDataIO':null,
+      };
+    });
   }
   async players() {
     const path = process.env.SPORTSDATAIO_PLAYERS_PATH || '/scores/json/Players';
@@ -82,7 +99,9 @@ class ESPNProvider implements NFLProvider {
       const competition=event.competitions?.[0];
       const home=competition?.competitors?.find((team:any)=>team.homeAway==='home');
       const away=competition?.competitors?.find((team:any)=>team.homeAway==='away');
-      return {id:String(event.id),season,week,seasonType,awayTeamCode:String(away?.team?.abbreviation||''),homeTeamCode:String(home?.team?.abbreviation||''),startsAt:new Date(event.date).toISOString(),status:normalizeStatus(event.status?.type?.description,event.status?.type?.completed),awayScore:away?.score==null?null:Number(away.score),homeScore:home?.score==null?null:Number(home.score)};
+      const odds=competition?.odds?.find((row:any)=>row?.awayTeamOdds?.moneyLine&&row?.homeTeamOdds?.moneyLine);
+      const market=noVigProbabilities(odds?.awayTeamOdds?.moneyLine,odds?.homeTeamOdds?.moneyLine);
+      return {id:String(event.id),season,week,seasonType,awayTeamCode:String(away?.team?.abbreviation||''),homeTeamCode:String(home?.team?.abbreviation||''),startsAt:new Date(event.date).toISOString(),status:normalizeStatus(event.status?.type?.description,event.status?.type?.completed),awayScore:away?.score==null?null:Number(away.score),homeScore:home?.score==null?null:Number(home.score),awayWinProbability:market?.away??null,homeWinProbability:market?.home??null,marketProvider:market?String(odds?.provider?.name||'Market'):null};
     }).filter((game:any)=>game.id&&game.awayTeamCode&&game.homeTeamCode);
   }
   async players(){return [];}
