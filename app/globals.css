@@ -1011,6 +1011,129 @@ p {
   border-radius: 15px;
   padding: 13px;
 }
+.survivorLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+.survivorLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.survivorLegend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.survivorLegend .advanced {
+  background: #41d17d;
+}
+.survivorLegend .eliminated {
+  background: #ff5b67;
+}
+.survivorLegend .pending {
+  background: #71819a;
+}
+.survivorGridWrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  scrollbar-color: #46546a transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.survivorGrid {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) repeat(18, 58px);
+  min-width: 1204px;
+}
+.survivorGrid > div {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.survivorGridHeader {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #131a25;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+.survivorGridHeader > div:first-child,
+.survivorEntryCell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  justify-content: flex-start;
+  background: #131a25;
+  box-shadow: 8px 0 12px #06090d80;
+}
+.survivorGridHeader > div:first-child {
+  z-index: 4;
+  padding-left: 14px;
+}
+.survivorEntryCell {
+  gap: 9px;
+  padding: 8px 12px;
+}
+.survivorEntryCell > b {
+  width: 24px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.survivorEntryCell > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.survivorEntryCell strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.survivorEntryCell small {
+  margin-top: 3px;
+  font-size: 8px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.survivorEntryCell small.alive {
+  color: #58dd8e;
+}
+.survivorEntryCell small.out {
+  color: #ff7882;
+}
+.survivorWeekCell {
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
+.survivorWeekCell.advanced {
+  background: #123a29;
+  color: #71e6a1;
+}
+.survivorWeekCell.eliminated {
+  background: #461c23;
+  color: #ff8b94;
+}
+.survivorWeekCell.pending {
+  background: #202a38;
+  color: #dce6f5;
+}
+.survivorWeekCell.empty {
+  color: #526075;
+  font-size: 8px;
+}
 .leaderRow > div {
   display: flex;
   flex-direction: column;
