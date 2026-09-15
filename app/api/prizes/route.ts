@@ -34,6 +34,15 @@ async function manageablePoolIds(supabase: SupabaseClient, userId: string) {
     ...(league || []).map((m: any) => m.pool_id),
   ]);
 }
+
+async function creatorPoolIds(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase
+    .from("pools")
+    .select("id")
+    .eq("created_by", userId);
+  if (error) throw error;
+  return new Set((data || []).map((pool) => pool.id));
+}
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
@@ -44,7 +53,10 @@ export async function GET() {
     const poolIds = (visiblePools || []).map((p) => p.id);
     if (!poolIds.length)
       return NextResponse.json({ prizes: [], pools: [], canManagePoolIds: [] });
-    const canManage = await manageablePoolIds(supabase, user.id);
+    const [canManage, canDelete] = await Promise.all([
+      manageablePoolIds(supabase, user.id),
+      creatorPoolIds(supabase, user.id),
+    ]);
     const { data: prizes, error } = await supabase
       .from("prizes")
       .select(
@@ -91,6 +103,7 @@ export async function GET() {
                 .filter((e) => e.user_id === user.id)
                 .map((e) => e.entry_name),
         can_manage: canManage.has(prize.pool_id),
+        can_delete: canDelete.has(prize.pool_id),
         eligible_entries: canManage.has(prize.pool_id) ? displayed : undefined,
       });
     }
@@ -98,6 +111,7 @@ export async function GET() {
       prizes: result,
       pools: visiblePools || [],
       canManagePoolIds: [...canManage],
+      canDeletePoolIds: [...canDelete],
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load prizes.";
@@ -247,10 +261,10 @@ export async function DELETE(req: Request) {
       .eq("id", prizeId)
       .single();
     if (error || !prize) throw error || new Error("Prize not found.");
-    const canManage = await manageablePoolIds(supabase, user.id);
-    if (!canManage.has(prize.pool_id))
+    const canDelete = await creatorPoolIds(supabase, user.id);
+    if (!canDelete.has(prize.pool_id))
       return NextResponse.json(
-        { error: "Commissioner access required." },
+        { error: "Only the commissioner who created this league can delete its prizes." },
         { status: 403 },
       );
     const { data: draws, error: drawsError } = await supabase
