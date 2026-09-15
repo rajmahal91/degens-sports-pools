@@ -17,8 +17,18 @@ export async function POST(request: Request) {
       supabase.from('pools').select('scoring_settings').eq('id',entry.pool_id).single(),
       supabase.from('games').select('kickoff_at').eq('sport','NFL').eq('week',Number(week)).eq('season',game.season),
     ]);
-    const lockAt=pickLockAt(game,weekGames||[],pool?.scoring_settings?.deadline_mode||'GAME_KICKOFF');
-    if (game.status !== 'SCHEDULED' || lockAt.getTime() <= Date.now()) return NextResponse.json({ error: 'This week is already locked.' }, { status: 400 });
+    const mode=pool?.scoring_settings?.deadline_mode||'GAME_KICKOFF';
+    const {data:existing}=await supabase.from('survivor_picks').select('id,game_id,team_code').eq('entry_id',entryId).eq('week',Number(week)).maybeSingle();
+    if(existing){
+      const {data:existingGame}=await supabase.from('games').select('id,kickoff_at,status').eq('id',existing.game_id).single();
+      if(!existingGame)return NextResponse.json({error:'The saved game could not be verified.'},{status:409});
+      const existingLockAt=pickLockAt(existingGame,weekGames||[],mode);
+      if(existingGame.status!=='SCHEDULED'||existingLockAt.getTime()<=Date.now()){
+        return NextResponse.json({error:`Your Week ${week} Survivor pick is locked because its game has started.`},{status:409});
+      }
+    }
+    const lockAt=pickLockAt(game,weekGames||[],mode);
+    if (game.status !== 'SCHEDULED' || lockAt.getTime() <= Date.now()) return NextResponse.json({ error: 'This game is already locked.' }, { status: 409 });
     const { data: used, error: usedError } = await supabase.from('survivor_picks').select('id,week').eq('entry_id',entryId).eq('team_code',teamCode).neq('week',Number(week)).limit(1);
     if (usedError) return NextResponse.json({ error: usedError.message }, { status: 400 });
     if (used?.length) return NextResponse.json({ error: `${teamCode} was already used in Week ${used[0].week}.` }, { status: 400 });
