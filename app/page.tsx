@@ -544,7 +544,7 @@ export default function Home() {
                   <strong>Create League</strong>
                   <small>Start a new pool</small>
                 </a>
-                <a href="/prizes">
+                <a href="/prizes?mode=commissioner">
                   <span>◇</span>
                   <strong>Prize Centre</strong>
                   <small>Manage prizes and draws</small>
@@ -1129,7 +1129,7 @@ export default function Home() {
               <div className="actionGrid">
                 <button>Send Pick Reminder</button>
                 <button>Lock Week</button>
-                <a href="/prizes">Prize Centre</a>
+                <a href="/prizes?mode=commissioner">Prize Centre</a>
                 <a href="/live?host=1">Go Live</a>
               </div>
             </>
