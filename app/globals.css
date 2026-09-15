@@ -842,6 +842,17 @@ p {
   font-size: 10px;
   color: var(--muted);
 }
+.teamPick .marketProbability {
+  margin-top: 3px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #17243a;
+  color: #b9d5ff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
 .teamPick:disabled {
   opacity: 0.4;
 }
