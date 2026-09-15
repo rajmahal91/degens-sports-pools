@@ -27,6 +27,7 @@ export default function Prizes() {
     [pools, setPools] = useState<Pool[]>([]),
     [manageable, setManageable] = useState<string[]>([]),
     [deletable, setDeletable] = useState<string[]>([]),
+    [commissionerView, setCommissionerView] = useState(false),
     [loading, setLoading] = useState(true),
     [message, setMessage] = useState("");
   const [manualDrafts, setManualDrafts] = useState<Record<string, string>>({});
@@ -63,6 +64,10 @@ export default function Prizes() {
     if (!poolId) setPoolId((j.canManagePoolIds || [])[0] || "");
   }
   useEffect(() => {
+    setCommissionerView(
+      new URLSearchParams(window.location.search).get("mode") ===
+        "commissioner",
+    );
     load().finally(() => setLoading(false));
   }, []);
   async function create(e: FormEvent) {
@@ -213,7 +218,13 @@ export default function Prizes() {
             record.
           </p>
         </div>
-        {!loading && manageable.length > 0 && (
+        {!loading && !commissionerView && manageable.length > 0 && (
+          <div className="notice">
+            Player view is read-only. Switch to Commissioner view from the
+            home dashboard to manage prizes.
+          </div>
+        )}
+        {!loading && commissionerView && manageable.length > 0 && (
           <form className="wideCard leagueForm" onSubmit={create}>
             <h2>Add Weekly Prize</h2>
             <label className="fieldLabel">
@@ -332,7 +343,7 @@ export default function Prizes() {
                       ? `✓ Eligible: ${p.my_eligible_entries.join(", ")}`
                       : "No eligible entry on this account"}
                   </div>
-                  {manageable.includes(p.pool_id) && (
+                  {commissionerView && manageable.includes(p.pool_id) && (
                     <div className="methodPanel">
                       <label className="fieldLabel">
                         <input
@@ -430,7 +441,7 @@ export default function Prizes() {
                       <small>
                         {d.overridden_at ? "AUDITED OVERRIDE" : "VERIFIED DRAW"}
                       </small>
-                      {deletable.includes(p.pool_id) && (
+                      {commissionerView && manageable.includes(p.pool_id) && (
                         <select
                           value={
                             d.winner_snapshot_id || d.winner_entry_id || ""
@@ -447,7 +458,7 @@ export default function Prizes() {
                       <a href={`/api/draws/verify?id=${d.id}`} target="_blank">
                         Verify
                       </a>
-                      {manageable.includes(p.pool_id) && (
+                      {commissionerView && deletable.includes(p.pool_id) && (
                         <button
                           type="button"
                           className="deletePrizeButton"
