@@ -30,7 +30,15 @@ export async function syncNFLWeek(season:number,week:number,seasonType:SeasonTyp
     away_team:game.awayTeamCode,home_team:game.homeTeamCode,kickoff_at:game.startsAt,status:game.status,
     away_score:game.awayScore??null,home_score:game.homeScore??null,
     winner_team:game.status==='FINAL'&&game.awayScore!==game.homeScore?(Number(game.awayScore)>Number(game.homeScore)?game.awayTeamCode:game.homeTeamCode):null,
-    raw:{provider:provider.name},updated_at:new Date().toISOString(),
+    raw:{
+      provider:provider.name,
+      market:game.awayWinProbability!=null&&game.homeWinProbability!=null?{
+        awayWinProbability:game.awayWinProbability,
+        homeWinProbability:game.homeWinProbability,
+        provider:game.marketProvider||'Market',
+        updatedAt:new Date().toISOString(),
+      }:null,
+    },updated_at:new Date().toISOString(),
   }));
   for(const row of rows){
     const {data:existing,error:lookupError}=await admin.from('games').select('id').eq('provider_game_id',row.provider_game_id).maybeSingle();
