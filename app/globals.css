@@ -2183,6 +2183,40 @@ p {
   font-size: clamp(30px, 5vw, 54px);
   margin: 8px 0;
 }
+.fantasyRules,
+.roundSummary,
+.roundProgress {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid #2b3443;
+  border-radius: 14px;
+  background: #111823;
+}
+.fantasyRules span,
+.roundSummary span,
+.roundProgress span {
+  color: #aab4c4;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.featureShell .fieldLabel {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  color: #dce3ee;
+  font-weight: 700;
+}
+.featureShell .textInput {
+  width: 100%;
+  box-sizing: border-box;
+  background: #151a23;
+  color: #fff;
+  border: 1px solid #333b49;
+  border-radius: 12px;
+  padding: 14px;
+}
 .twoSelects {
   display: grid;
   grid-template-columns: 1fr 1fr;
