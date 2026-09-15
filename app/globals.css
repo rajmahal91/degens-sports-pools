@@ -1079,16 +1079,26 @@ p {
 }
 .survivorGridHeader > div:first-child {
   z-index: 4;
-  padding-left: 14px;
+  padding: 0 12px;
 }
+.survivorEntryHeader,
 .survivorEntryCell {
-  gap: 9px;
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
   padding: 8px 12px;
 }
+.survivorEntryHeader > b {
+  color: var(--muted);
+  text-align: left;
+}
+.survivorEntryHeader > span {
+  text-align: left;
+}
 .survivorEntryCell > b {
-  width: 24px;
   color: var(--muted);
   font-size: 11px;
+  text-align: left;
 }
 .survivorEntryCell > span {
   display: flex;
