@@ -114,6 +114,7 @@ export async function GET() {
       canHost,
       visiblePoolCount: poolIds.length,
       manageablePoolCount: canManage.size,
+      deletablePoolCount: canManage.size,
     });
     return NextResponse.json({
       prizes: result,
