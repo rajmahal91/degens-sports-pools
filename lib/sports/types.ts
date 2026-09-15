@@ -4,6 +4,7 @@ export interface ProviderNFLGame {
   id: string; season: string; week: number; seasonType: 'REG' | 'POST';
   awayTeamCode: string; homeTeamCode: string; startsAt: string; status: ProviderGameStatus;
   awayScore?: number | null; homeScore?: number | null;
+  awayWinProbability?: number | null; homeWinProbability?: number | null; marketProvider?: string | null;
 }
 
 export interface ProviderAthlete {
