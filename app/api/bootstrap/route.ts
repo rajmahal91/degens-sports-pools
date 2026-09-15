@@ -17,11 +17,14 @@ export async function GET() {
       supabase.from('entries').select('*').eq('user_id',user.id).order('created_at'),
       supabase.from('games').select('*').eq('sport','NFL').order('kickoff_at').limit(400),
       supabase.from('athletes').select('id,name,team_code,position,active').eq('sport','NFL').eq('active',true).limit(1200),
-      supabase.from('league_members').select('pool_id').eq('user_id',user.id).eq('status','ACTIVE'),
+      supabase.from('league_members').select('pool_id,role').eq('user_id',user.id).eq('status','ACTIVE'),
       supabase.from('organization_members').select('organization_id,role').eq('user_id',user.id).eq('status','ACTIVE').in('role',['OWNER','ADMIN','COMMISSIONER']),
       supabase.from('organizations').select('id').eq('owner_user_id',user.id),
     ]);
     const memberPoolIds=(leagueMemberships||[]).map(m=>m.pool_id);
+    const managedLeaguePoolIds=(leagueMemberships||[])
+      .filter(m=>['COMMISSIONER','CO_COMMISSIONER'].includes(m.role))
+      .map(m=>m.pool_id);
     const entryPoolIds=(entries||[]).map(e=>e.pool_id);
     const visiblePoolIds=[...new Set([...memberPoolIds,...entryPoolIds])];
     const managedOrganizationIds=[...new Set([
@@ -37,6 +40,10 @@ export async function GET() {
         : Promise.resolve({data:[]}),
     ]);
     const pools=[...new Map([...(memberPools||[]),...(managedPools||[])].map(pool=>[pool.id,pool])).values()];
+    const manageablePoolIds=[...new Set([
+      ...managedLeaguePoolIds,
+      ...(managedPools||[]).map(pool=>pool.id),
+    ])];
     const poolIds=(pools||[]).map(p=>p.id);
     const {data:rounds}=poolIds.length?await supabase.from('rounds').select('*').in('pool_id',poolIds).order('round_order'):({data:[]} as any);
     const entryIds=(entries||[]).map(e=>e.id);
@@ -55,7 +62,7 @@ export async function GET() {
       currentWeek=week;
       if(!complete) break;
     }
-    return NextResponse.json({ user:{id:user.id,email:user.email}, profile, pools:pools||[], entries:entries||[], games:nflGames, rounds:rounds||[], survivor:survivor||[], pickem:pickem||[], fantasy:fantasy||[], athletes:athletes||[], currentWeek });
+    return NextResponse.json({ user:{id:user.id,email:user.email}, profile, pools:pools||[], manageablePoolIds, entries:entries||[], games:nflGames, rounds:rounds||[], survivor:survivor||[], pickem:pickem||[], fantasy:fantasy||[], athletes:athletes||[], currentWeek });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unauthenticated' }, { status: 401 });
   }
