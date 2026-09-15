@@ -19,10 +19,20 @@ export async function GET(request:Request){
       return NextResponse.json({error:'A valid NFL season and week are required.'},{status:400});
     }
     const weeks=week>1?[week-1,week]:[week];
-    const [previous,current]=await Promise.all([
+    const settled=await Promise.allSettled([
       week>1?refreshWeek(season,week-1):Promise.resolve(null),
       refreshWeek(season,week),
     ]);
+    const [previousResult,currentResult]=settled;
+    for(const [index,result] of settled.entries()){
+      if(result.status==='rejected')console.error('[api/nfl/live] refresh failed',{
+        season,
+        week:index===0&&week>1?week-1:week,
+        error:result.reason instanceof Error?result.reason.message:String(result.reason),
+      });
+    }
+    const previous=previousResult.status==='fulfilled'?previousResult.value:null;
+    const current=currentResult.status==='fulfilled'?currentResult.value:null;
     const sync={previous,current};
     const [{data:games,error:gamesError},{data:entries,error:entriesError}]=await Promise.all([
       supabase.from('games').select('*').eq('sport','NFL').eq('season',season).in('week',weeks).order('kickoff_at'),
@@ -37,6 +47,7 @@ export async function GET(request:Request){
     return NextResponse.json({games:games||[],entries:entries||[],picks:picks||[],sync},{headers:{'Cache-Control':'private, no-store'}});
   }catch(error){
     const message=error instanceof Error?error.message:'Live scores could not be refreshed.';
+    console.error('[api/nfl/live] request failed',{error:message});
     return NextResponse.json({error:message},{status:message==='UNAUTHENTICATED'?401:500});
   }
 }
