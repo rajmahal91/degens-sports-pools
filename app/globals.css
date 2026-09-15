@@ -938,6 +938,13 @@ p {
   border-color: var(--accent);
   color: var(--accent);
 }
+.pickemGame.locked {
+  border-color: #4b3440;
+}
+.pickButtons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 .leaderRow {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
