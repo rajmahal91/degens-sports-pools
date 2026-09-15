@@ -817,6 +817,7 @@ p {
   color: var(--muted);
   margin-bottom: 8px;
 }
+.gameTime{display:flex;justify-content:space-between;align-items:center;gap:12px}.gameTime b{font-size:11px;letter-spacing:.12em;color:#91a0b7}.gameCard:has(.gameTime b:last-child){transition:border-color .2s ease}.teamPick strong{font-size:22px;line-height:1;color:#fff}
 .matchup {
   display: grid;
   grid-template-columns: 1fr 28px 1fr;
