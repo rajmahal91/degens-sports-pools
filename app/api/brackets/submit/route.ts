@@ -33,13 +33,16 @@ export async function POST(request: Request) {
     if (!pool || !["NHL", "NBA"].includes(pool.sport)) return NextResponse.json({ error: "Choose an NHL or NBA bracket league." }, { status: 400 });
     const { data: entry } = await supabase.from("entries").select("id").eq("pool_id", poolId).eq("user_id", user.id).eq("entry_status", "ACTIVE").maybeSingle();
     if (!entry) return NextResponse.json({ error: "Join this bracket league before submitting." }, { status: 403 });
-    const { data: matchups } = await supabase.from("bracket_matchups").select("id,team1,team2").eq("pool_id", poolId);
+    const { data: matchups } = await supabase.from("bracket_matchups").select("id,team1,team2,winner_team").eq("pool_id", poolId).order("round_number").order("matchup_number");
+    if (!matchups?.length) return NextResponse.json({ error: "Official playoff matchups have not been confirmed yet." }, { status: 409 });
+    if (matchups.some((matchup) => matchup.winner_team)) return NextResponse.json({ error: "This bracket is locked because playoff results have begun." }, { status: 409 });
     const allowed = new Map((matchups || []).map((m) => [m.id, m]));
     const rows = Object.entries(body.picks).map(([matchupId, pick]: any) => {
       const matchup = allowed.get(matchupId);
       const winner = String(pick?.winner || "");
       const seriesLength = Number(pick?.seriesLength);
       if (!matchup || !winner || !Number.isInteger(seriesLength) || seriesLength < 4 || seriesLength > 7) throw new Error("Complete every series with a valid winner and series length.");
+      if (![matchup.team1, matchup.team2].includes(winner)) throw new Error("Choose one of the teams in each series.");
       return { entry_id: entry.id, matchup_id: matchupId, predicted_winner: winner, predicted_series_length: seriesLength, points_awarded: 0 };
     });
     if (rows.length !== allowed.size) return NextResponse.json({ error: `Complete all ${allowed.size} series before submitting.` }, { status: 400 });
