@@ -1,6 +1,6 @@
 const config = {
   appId: "com.degens.sportspools",
-  appName: "Degens Sports Pools",
+  appName: "Sports Syndicate Fantasy",
   webDir: "out",
   server: {
     url: "https://degens-sports-pools-iota.vercel.app",
