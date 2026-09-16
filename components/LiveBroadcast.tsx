@@ -88,6 +88,7 @@ function CommissionerMediaControls() {
     isMicrophoneEnabled,
     isScreenShareEnabled,
     microphoneTrack,
+    cameraTrack,
   } = useLocalParticipant();
   const room = useRoomContext();
   const connectionState = useConnectionState(),
@@ -96,12 +97,16 @@ function CommissionerMediaControls() {
   const [busy, setBusy] = useState(""),
     [error, setError] = useState("");
   const isLive = isCameraEnabled || isMicrophoneEnabled || isScreenShareEnabled;
-  const localCamera = useTracks(
-    [{ source: Track.Source.Camera, withPlaceholder: false }],
-    { onlySubscribed: false },
-  )
-    .filter(isTrackReference)
-    .find((track) => track.participant.identity === localParticipant.identity);
+  // Build the preview directly from the publication returned by the local
+  // participant hook. This avoids a track-enumeration race on mobile Safari
+  // where the camera is published but the host preview remains blank.
+  const localCamera = cameraTrack
+    ? {
+        participant: localParticipant,
+        publication: cameraTrack,
+        source: Track.Source.Camera,
+      }
+    : undefined;
   const meterFrame = useRef<number>(0),
     audioContext = useRef<AudioContext | null>(null);
   useEffect(
@@ -160,7 +165,10 @@ function CommissionerMediaControls() {
           const publication = await localParticipant.setCameraEnabled(true, {
             facingMode: "user",
           });
-          if (!publication)
+          if (
+            !publication?.track ||
+            publication.track.mediaStreamTrack.readyState !== "live"
+          )
             throw new Error("The camera could not be started.");
         }
       }
@@ -178,7 +186,10 @@ function CommissionerMediaControls() {
             noiseSuppression: true,
             autoGainControl: true,
           });
-          if (!publication)
+          if (
+            !publication?.track ||
+            publication.track.mediaStreamTrack.readyState !== "live"
+          )
             throw new Error("The microphone could not be started.");
         }
       }
@@ -215,7 +226,10 @@ function CommissionerMediaControls() {
         const cameraPublication = await localParticipant.setCameraEnabled(true, {
           facingMode: "user",
         });
-        if (!cameraPublication)
+        if (
+          !cameraPublication?.track ||
+          cameraPublication.track.mediaStreamTrack.readyState !== "live"
+        )
           throw new Error("The camera could not be started.");
         let microphonePublication;
         try {
@@ -231,7 +245,10 @@ function CommissionerMediaControls() {
           await localParticipant.setCameraEnabled(false);
           throw microphoneError;
         }
-        if (!microphonePublication) {
+        if (
+          !microphonePublication?.track ||
+          microphonePublication.track.mediaStreamTrack.readyState !== "live"
+        ) {
           await localParticipant.setCameraEnabled(false);
           throw new Error("The microphone could not be started.");
         }
@@ -369,7 +386,9 @@ function ViewerStage() {
       { source: Track.Source.Camera, withPlaceholder: false },
     ],
     { onlySubscribed: false },
-  ).filter(isTrackReference);
+  )
+    .filter(isTrackReference)
+    .filter((track) => !track.participant.isLocal);
   const primary =
     tracks.find((track) => track.source === Track.Source.ScreenShare) ||
     tracks.find((track) => track.source === Track.Source.Camera);

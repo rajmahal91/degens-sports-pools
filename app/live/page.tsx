@@ -67,6 +67,7 @@ export default function LiveDraw() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
       explicitViewer = params.get("viewer") === "1",
+      explicitHost = params.get("host") === "1",
       previewRequested = explicitViewer && params.get("preview") === "1",
       requestedRoom = (params.get("room") || "")
         .toUpperCase()
@@ -77,7 +78,10 @@ export default function LiveDraw() {
     setViewerMode(explicitViewer);
     load()
       .then((canHost) => {
-        const host = Boolean(canHost) && !previewRequested;
+        // Account capability alone must never switch a player-view link into
+        // host mode. Host controls require both commissioner authorization and
+        // an explicit host route from the Commissioner dashboard.
+        const host = Boolean(canHost) && explicitHost && !previewRequested;
         setIsHost(host);
         if (host) {
           const code =
@@ -93,6 +97,10 @@ export default function LiveDraw() {
           window.history.replaceState({}, "", `/live?host=1&room=${code}`);
           return;
         }
+        if (explicitHost && !canHost)
+          setMessage(
+            "Commissioner access is required to start a live broadcast. Enter a live entry code to join as a viewer.",
+          );
         setViewerMode(true);
         setMeetingCode(previewRequested ? requestedRoom : "");
         if (!previewRequested)
@@ -204,9 +212,9 @@ export default function LiveDraw() {
   return (
     <main className="drawPage">
       <header className="drawTop">
-        <a href="/">← Degens</a>
+        <a href="/">← Home</a>
         <div>
-          <b>🔴 LIVE DRAW ROOM</b>
+          <b>LIVE DRAW ROOM</b>
           <span>{viewerMode ? "Viewer mode" : "Commissioner meeting"}</span>
         </div>
         <a href={isHost ? "/prizes?mode=commissioner" : "/prizes"}>
@@ -246,8 +254,9 @@ export default function LiveDraw() {
       {roleReady && viewerMode && !meetingCode && (
         <section className="joinMeetingCard">
           <span>JOIN LIVE DRAW</span>
-          <h1>Enter meeting code</h1>
+          <h1>Enter live entry code</h1>
           <p>Enter the six-character code shared by your commissioner.</p>
+          {message && <div className="notice">{message}</div>}
           <input
             value={joinCode}
             maxLength={6}
@@ -264,7 +273,7 @@ export default function LiveDraw() {
             disabled={joinCode.length !== 6}
             onClick={joinMeeting}
           >
-            Join as Viewer
+            Watch Live
           </button>
         </section>
       )}
@@ -285,7 +294,7 @@ export default function LiveDraw() {
               </div>
             )}
             <div className="liveMeta">
-              <b>Degens Prize Night</b>
+              <b>Sports Syndicate Prize Night</b>
               <span>
                 {isHost
                   ? "Host controls · viewers are watch-only"

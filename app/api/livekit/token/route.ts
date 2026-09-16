@@ -23,13 +23,15 @@ function cleanLiveKitUrl(raw:string|undefined){
 export async function POST(req:Request){
  try{
   const body=await req.json().catch(()=>({})); const asHost=!!body.asHost; const auth=asHost?await requireCommissioner():await requireUser(); const user=auth.user;
-  const roomName=String(body.roomName||'degens-live'); const key=cleanCredential(process.env.LIVEKIT_API_KEY,'LIVEKIT_API_KEY'),secret=cleanCredential(process.env.LIVEKIT_API_SECRET,'LIVEKIT_API_SECRET'),url=cleanLiveKitUrl(process.env.LIVEKIT_URL||process.env.NEXT_PUBLIC_LIVEKIT_URL)||'wss://degens-sports-pool-6nhxzczw.livekit.cloud';
+  const roomName=String(body.roomName||'').trim();
+  if(!/^degens-[A-Z0-9]{6}$/.test(roomName))return NextResponse.json({error:'Enter a valid six-character live entry code.'},{status:400});
+  const key=cleanCredential(process.env.LIVEKIT_API_KEY,'LIVEKIT_API_KEY'),secret=cleanCredential(process.env.LIVEKIT_API_SECRET,'LIVEKIT_API_SECRET'),url=cleanLiveKitUrl(process.env.LIVEKIT_URL||process.env.NEXT_PUBLIC_LIVEKIT_URL)||'wss://degens-sports-pool-6nhxzczw.livekit.cloud';
   if(!key||!secret||!url)return NextResponse.json({error:'LiveKit is not configured.'},{status:503});
   // A unique identity prevents a viewer preview tab from replacing the
   // commissioner's publishing session (LiveKit identities are room-unique).
   const identity=`${user.id}:${asHost?'host':'viewer'}:${randomUUID()}`;
   const {data:profile}=await auth.supabase.from('profiles').select('display_name,username').eq('id',user.id).maybeSingle();
-  const participantName=profile?.display_name||profile?.username||user.email?.split('@')[0]||'Degens Player';
+  const participantName=profile?.display_name||profile?.username||user.email?.split('@')[0]||'Sports Syndicate Player';
   const token=new AccessToken(key,secret,{identity,name:participantName,ttl:'2h',metadata:JSON.stringify({role:asHost?'host':'viewer'})});
   token.addGrant({roomJoin:true,room:roomName,canPublish:asHost,canSubscribe:true,canPublishData:true,canPublishSources:asHost?[TrackSource.CAMERA,TrackSource.MICROPHONE,TrackSource.SCREEN_SHARE,TrackSource.SCREEN_SHARE_AUDIO]:[]});
   console.info('[api/livekit/token] issued',{userId:user.id,roomName,role:asHost?'host':'viewer',canPublish:asHost});
