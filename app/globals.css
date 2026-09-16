@@ -1692,6 +1692,17 @@ p {
   padding: 8px;
   font-size: 11px;
 }
+.memberActions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 6px;
+  width: 100%;
+}
+.dangerButton {
+  border-color: #7d3740 !important;
+  background: #3a1820 !important;
+  color: #ffb7bd !important;
+}
 @media (max-width: 760px) {
   .leagueAdminGrid {
     grid-template-columns: 1fr;

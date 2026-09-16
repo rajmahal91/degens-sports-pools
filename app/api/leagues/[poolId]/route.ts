@@ -126,6 +126,20 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       if(auditError)throw auditError;
       return NextResponse.json({success:true,member:data});
     }
+    if(body.action==='remove_member'){
+      const memberId=String(body.userId||'');
+      if(!memberId)return NextResponse.json({error:'Member not found.'},{status:400});
+      const {data:before}=await supabase.from('league_members').select('*').eq('pool_id',poolId).eq('user_id',memberId).maybeSingle();
+      if(!before)return NextResponse.json({error:'Member not found.'},{status:404});
+      if(before.role==='COMMISSIONER')return NextResponse.json({error:'The lead commissioner cannot be removed from the league.'},{status:400});
+      const {data:member,error}=await supabase.from('league_members').update({status:'LEFT'}).eq('pool_id',poolId).eq('user_id',memberId).select('*').single();
+      if(error)throw error;
+      const {data:entries,error:entriesError}=await supabase.from('entries').update({entry_status:'INACTIVE'}).eq('pool_id',poolId).eq('user_id',memberId).select('id,entry_status');
+      if(entriesError)throw entriesError;
+      const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'MEMBER_REMOVED',entity_type:'league_member',entity_id:poolId,payload:{user_id:memberId,before,after:member,deactivated_entries:entries||[]}});
+      if(auditError)throw auditError;
+      return NextResponse.json({success:true,member});
+    }
     if(body.action==='run_scoring'){
       const week=Math.max(1,Math.min(22,Number(body.week)||1));
       const result=await syncAndGradeNFLWeek(Number(pool.season),week,body.seasonType==='POST'?'POST':'REG',supabase,poolId,{trigger:'commissioner',recordRun:true});
