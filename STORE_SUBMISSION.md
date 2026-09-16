@@ -1,4 +1,4 @@
-# Degens Sports Pools — Store Submission Plan
+# Sports Syndicate Fantasy — Store Submission Plan
 
 ## Current release direction
 
@@ -19,7 +19,7 @@ Native-only work that must be tested before submission:
 Run locally after installing Node and the Capacitor CLI:
 
 1. npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
-2. npx cap init "Degens Sports Pools" "com.degens.sportspools" --web-dir=out
+2. npx cap init "Sports Syndicate Fantasy" "com.degens.sportspools" --web-dir=out
 3. Configure the production Vercel URL as the Capacitor server URL for the first hosted-shell build, or export a fully static/native web bundle when the app is ready for that architecture.
 4. npx cap add ios
 5. npx cap add android
@@ -31,7 +31,7 @@ The production app must remain usable in Safari/Chrome as well; the native wrapp
 
 ## Apple App Store information
 
-- App name: Degens Sports Pools
+- App name: Sports Syndicate Fantasy
 - Subtitle: Survivor, Pick'em & Pool Picks
 - Primary category: Sports
 - Privacy Policy URL: https://degens-sports-pools-iota.vercel.app/privacy
@@ -41,7 +41,7 @@ The production app must remain usable in Safari/Chrome as well; the native wrapp
 
 ## Google Play information
 
-- App name: Degens Sports Pools
+- App name: Sports Syndicate Fantasy
 - Category: Sports
 - Privacy Policy URL: https://degens-sports-pools-iota.vercel.app/privacy
 - Account deletion URL: https://degens-sports-pools-iota.vercel.app/account/delete
