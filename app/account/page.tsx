@@ -63,7 +63,7 @@ export default function AccountPage() {
   return (
     <main className="authShell">
       <form className="authCard accountCard" onSubmit={save}>
-        <a className="backLink" href="/">← Back to Degens</a>
+        <a className="backLink" href="/">← Back to Sports Syndicate</a>
         <span className="eyebrow">SIGNED IN ACCOUNT</span>
         <div className="accountSummary">
           <div className="accountAvatar">{(username || displayName || email || "?").charAt(0).toUpperCase()}</div>

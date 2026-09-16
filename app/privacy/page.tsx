@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <h2>How we use information</h2>
       <p>We use this information to authenticate users, operate leagues, save picks, calculate standings, administer verified draws, send optional deadline and missed-pick reminders, provide customer support, prevent abuse, and maintain the security and reliability of the service.</p>
       <h2>Service providers</h2>
-      <p>Degens Sports Pools uses infrastructure and service providers such as Vercel, Supabase, and optional LiveKit services to host the application, store account data, and provide live broadcasts. These providers process information only as needed to provide their services.</p>
+      <p>Sports Syndicate Fantasy uses infrastructure and service providers such as Vercel, Supabase, and optional LiveKit services to host the application, store account data, and provide live broadcasts. These providers process information only as needed to provide their services.</p>
       <h2>Sharing</h2>
       <p>We do not sell personal information. Information may be visible to other members of a league only where needed for pool standings, entries, picks, or draw results. We may disclose information when required by law or to protect the service and its users.</p>
       <h2>Retention and security</h2>

@@ -742,9 +742,7 @@ export default function Home() {
       <header className="topbar">
         <a className="homeBrand" href="/" aria-label="Sports Syndicate Fantasy home">
           <div className="brand">SPORTS SYNDICATE</div>
-          <div className="subbrand">
-            FANTASY {connected ? "· CONNECTED" : "· DEMO"}
-          </div>
+          <div className="subbrand">FANTASY</div>
         </a>
         <div className="topActions">
           {process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -796,12 +794,12 @@ export default function Home() {
           <div className="dashboardWelcome">
             <div>
               <span className="eyebrow">
-                {role === "COMMISSIONER" ? "COMMISSIONER CONTROL ROOM" : `WEEK ${currentWeek}`}
+                {role === "COMMISSIONER" ? "COMMISSIONER CONTROL ROOM" : signedOut ? "YOUR SPORTS POOL HUB" : `WEEK ${currentWeek}`}
               </span>
               <h1>
                 {role === "COMMISSIONER"
                   ? "Everything under control."
-                  : `Welcome back, ${dashboardIdentity}.`}
+                  : signedOut ? "Welcome to Sports Syndicate Fantasy." : `Welcome back, ${dashboardIdentity}.`}
               </h1>
               <p>
                 {role === "COMMISSIONER"
@@ -809,11 +807,11 @@ export default function Home() {
                   : "Your next move, standings and prizes are ready below."}
               </p>
             </div>
-            <div className="weekBadge">
+            {signedOut ? null : <div className="weekBadge">
               <small>CURRENT</small>
               <strong>{currentWeek}</strong>
               <span>WEEK</span>
-            </div>
+            </div>}
           </div>
 
           {role === "PLAYER" ? (
@@ -989,9 +987,12 @@ export default function Home() {
 
                 <article className="dashboardPanel updatePanel">
                   <span className="panelKicker">LEAGUE UPDATE</span>
-                  <h2>Week {currentWeek} is open</h2>
-                  <p>Submit selections early. Games lock according to your league’s deadline settings.</p>
-                  <button onClick={() => setTab("pools")}>Open My Pools</button>
+                  <h2>{signedOut ? "Your leagues start here" : `Week ${currentWeek} is open`}</h2>
+                  <p>{signedOut ? "Sign in to view your leagues, deadlines and submitted picks." : "Submit selections early. Games lock according to your league’s deadline settings."}</p>
+                  <button onClick={() => {
+                    if (signedOut) window.location.href = "/auth/login?reason=required";
+                    else setTab("pools");
+                  }}>{signedOut ? "Sign In to Continue" : "Open My Pools"}</button>
                 </article>
               </div>
             </>

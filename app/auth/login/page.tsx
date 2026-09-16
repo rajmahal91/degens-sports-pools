@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState('');
   const [next, setNext] = useState('/');
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [signInRequired, setSignInRequired] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export default function LoginPage() {
     const requested = params.get('next') || '/';
     setNext(requested.startsWith('/') && !requested.startsWith('//') ? requested : '/');
     setSessionExpired(params.get('reason') === 'session');
+    setSignInRequired(params.get('reason') === 'required');
     setConfirmation(params.get('confirmation'));
   }, []);
 
@@ -49,6 +51,9 @@ export default function LoginPage() {
 
         {sessionExpired && (
           <div className="notice">Your session expired in this app. Sign in again to continue.</div>
+        )}
+        {signInRequired && !sessionExpired && (
+          <div className="notice">Sign in to continue to that page.</div>
         )}
         {confirmation === 'verified' && (
           <div className="notice">Your email has been confirmed. Please sign in to continue.</div>

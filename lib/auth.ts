@@ -23,3 +23,25 @@ export async function requireCommissioner() {
   if (!profile?.is_commissioner) throw new Error('FORBIDDEN');
   return { supabase, user };
 }
+
+export async function requirePoolManager(poolId: string) {
+  const { supabase, user } = await requireUser();
+  const { data: pool, error: poolError } = await supabase
+    .from('pools')
+    .select('id,organization_id,sport,pool_type,season')
+    .eq('id', poolId)
+    .maybeSingle();
+  if (poolError) throw poolError;
+  if (!pool) throw new Error('NOT_FOUND');
+
+  const [{ data: organization }, { data: organizationMember }, { data: leagueMember }] = await Promise.all([
+    supabase.from('organizations').select('owner_user_id').eq('id', pool.organization_id).maybeSingle(),
+    supabase.from('organization_members').select('role,status').eq('organization_id', pool.organization_id).eq('user_id', user.id).maybeSingle(),
+    supabase.from('league_members').select('role,status').eq('pool_id', poolId).eq('user_id', user.id).maybeSingle(),
+  ]);
+  const canManage = organization?.owner_user_id === user.id
+    || (organizationMember?.status === 'ACTIVE' && ['OWNER', 'ADMIN', 'COMMISSIONER'].includes(organizationMember.role))
+    || (leagueMember?.status === 'ACTIVE' && ['COMMISSIONER', 'CO_COMMISSIONER'].includes(leagueMember.role));
+  if (!canManage) throw new Error('FORBIDDEN');
+  return { supabase, user, pool };
+}

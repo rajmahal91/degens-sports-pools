@@ -61,8 +61,8 @@ export default function SignUpPage() {
   return (
     <main className="authShell">
       <form className="authCard" onSubmit={submit}>
-        <div className="brand">DEGENS</div>
-        <span className="eyebrow">SPORTS POOLS</span>
+        <div className="brand">SPORTS SYNDICATE</div>
+        <span className="eyebrow">FANTASY</span>
         <h1>Create account</h1>
         <label>
           Display name

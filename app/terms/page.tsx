@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Terms of Service | Degens Sports Pools",
-  description: "Terms of Service for Degens Sports Pools.",
+  title: "Terms of Service | Sports Syndicate Fantasy",
+  description: "Terms of Service for Sports Syndicate Fantasy.",
 };
 
 export default function TermsPage() {
@@ -8,7 +8,7 @@ export default function TermsPage() {
     <main className="legalPage">
       <h1>Terms of Service</h1>
       <p><strong>Last updated:</strong> September 15, 2026</p>
-      <p>By creating an account or using Degens Sports Pools, you agree to use the service lawfully and to follow the rules published for each pool.</p>
+      <p>By creating an account or using Sports Syndicate Fantasy, you agree to use the service lawfully and to follow the rules published for each pool.</p>
       <h2>Accounts</h2>
       <p>You are responsible for maintaining the confidentiality of your account and for activity performed through it. You must provide accurate information and may not impersonate another person or create accounts to evade a pool restriction.</p>
       <h2>Pool rules</h2>
@@ -20,7 +20,7 @@ export default function TermsPage() {
       <h2>Availability and changes</h2>
       <p>The service may change, be suspended, or be discontinued. We may update these terms and will publish the updated version in the app.</p>
       <h2>Contact</h2>
-      <p>For support or questions about a pool, contact its commissioner or the Degens Sports Pools operator through the support contact provided in the app.</p>
+      <p>For support or questions about a pool, contact its commissioner or the Sports Syndicate Fantasy operator through the support contact provided in the app.</p>
     </main>
   );
 }

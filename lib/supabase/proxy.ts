@@ -17,6 +17,15 @@ export async function updateSession(request: NextRequest) {
       },
     },
   });
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  const protectedPaths = ['/account', '/beta', '/leagues/new', '/live', '/prizes'];
+  if (!user && protectedPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`))) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/auth/login';
+    loginUrl.search = '';
+    loginUrl.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    loginUrl.searchParams.set('reason', 'required');
+    return NextResponse.redirect(loginUrl);
+  }
   return response;
 }

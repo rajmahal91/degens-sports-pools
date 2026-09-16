@@ -24,7 +24,7 @@ export default function BetaPage() {
   return (
     <main className="authShell">
       <section className="authCard">
-        <div className="brand">DEGENS</div>
+        <div className="brand">SPORTS SYNDICATE</div>
         <span className="eyebrow">RUN YOUR OWN LEAGUE</span>
         <h1>Become a commissioner</h1>
         <p>

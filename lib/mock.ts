@@ -1,8 +1,8 @@
 import { Entry, NFLGame, Pool, SurvivorPick } from './types';
 
 export const pools: Pool[] = [
-  { id: 'nfl-survivor', name: 'NFL Degens Survivor', sport: 'NFL', type: 'SURVIVOR', status: 'ACTIVE', season: '2026', registrationClosesAt: '2026-09-07T23:59:00-07:00' },
-  { id: 'nfl-pickem', name: 'NFL Degens Pick’em', sport: 'NFL', type: 'PICKEM', status: 'ACTIVE', season: '2026' },
+  { id: 'nfl-survivor', name: 'Sports Syndicate Survivor', sport: 'NFL', type: 'SURVIVOR', status: 'ACTIVE', season: '2026', registrationClosesAt: '2026-09-07T23:59:00-07:00' },
+  { id: 'nfl-pickem', name: 'Sports Syndicate Pick’em', sport: 'NFL', type: 'PICKEM', status: 'ACTIVE', season: '2026' },
   { id: 'nfl-playoff-fantasy', name: 'NFL Playoff Fantasy', sport: 'NFL', type: 'PLAYOFF_FANTASY', status: 'OPEN', season: '2026-27' },
   { id: 'nhl-bracket', name: 'NHL Playoff Bracket', sport: 'NHL', type: 'BRACKET', status: 'OPEN', season: '2026-27' },
   { id: 'nba-bracket', name: 'NBA Playoff Bracket', sport: 'NBA', type: 'BRACKET', status: 'OPEN', season: '2026-27' },

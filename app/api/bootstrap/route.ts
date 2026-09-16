@@ -7,7 +7,6 @@ export async function GET() {
     const [
       {data:profile},
       {data:entries},
-      {data:games},
       {data:athletes},
       {data:leagueMemberships},
       {data:organizationMemberships},
@@ -15,7 +14,6 @@ export async function GET() {
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id',user.id).single(),
       supabase.from('entries').select('*').eq('user_id',user.id).order('created_at'),
-      supabase.from('games').select('*').eq('sport','NFL').order('kickoff_at').limit(400),
       supabase.from('athletes').select('id,name,team_code,position,active').eq('sport','NFL').eq('active',true).limit(1200),
       supabase.from('league_members').select('pool_id,role').eq('user_id',user.id).eq('status','ACTIVE'),
       supabase.from('organization_members').select('organization_id,role').eq('user_id',user.id).eq('status','ACTIVE').in('role',['OWNER','ADMIN','COMMISSIONER']),
@@ -40,6 +38,10 @@ export async function GET() {
         : Promise.resolve({data:[]}),
     ]);
     const pools=[...new Map([...(memberPools||[]),...(managedPools||[])].map(pool=>[pool.id,pool])).values()];
+    const currentYear=new Date().getUTCFullYear();
+    const nflPoolSeasons=[...new Set(pools.filter(pool=>pool.sport==='NFL'&&pool.is_active!==false).map(pool=>Number(pool.season)).filter(Number.isFinite))].sort((a,b)=>b-a);
+    const nflSeason=nflPoolSeasons.includes(currentYear)?currentYear:nflPoolSeasons.find(season=>season<=currentYear)||nflPoolSeasons[0]||currentYear;
+    const {data:seasonGames}=await supabase.from('games').select('*').eq('sport','NFL').eq('season',nflSeason).order('kickoff_at').limit(320);
     const manageablePoolIds=[...new Set([
       ...managedLeaguePoolIds,
       ...(managedPools||[]).map(pool=>pool.id),
@@ -52,7 +54,8 @@ export async function GET() {
       supabase.from('pickem_picks').select('*').in('entry_id',entryIds),
       supabase.from('playoff_fantasy_picks').select('*,athletes(name,team_code,position)').in('entry_id',entryIds),
     ]) : [{data:[]},{data:[]},{data:[]}];
-    const nflGames=games||[];
+    const playoffRoundLabels=new Set(['Wild Card','Divisional','Conference Championship','Super Bowl']);
+    const nflGames=(seasonGames||[]).filter((game:any)=>game.raw?.seasonType!=='POST'&&!playoffRoundLabels.has(game.round_label));
     const weeks=[...new Set(nflGames.map((game:any)=>Number(game.week)).filter(Boolean))].sort((a,b)=>a-b);
     const sixHoursAgo=Date.now()-(6*60*60*1000);
     let currentWeek=weeks[0]||1;

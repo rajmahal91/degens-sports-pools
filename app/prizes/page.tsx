@@ -52,7 +52,7 @@ export default function Prizes() {
     const r = await api("/api/prizes");
     const j = await r.json();
     if (r.status === 401 && j.error === "UNAUTHENTICATED") {
-      window.location.replace("/auth/login?next=/prizes&reason=session");
+      window.location.replace("/auth/login?next=/prizes&reason=required");
       return;
     }
     if (!r.ok) {
@@ -216,9 +216,9 @@ export default function Prizes() {
   return (
     <main className="prizePage">
       <header className="prizeTop">
-        <a href="/">← Degens</a>
+        <a href="/">← Home</a>
         <div>
-          <b>DEGENS</b>
+          <b>SPORTS SYNDICATE</b>
           <span>PRIZE CENTRE</span>
         </div>
         <a href="/live?host=1">Spin Wheel</a>

@@ -49,7 +49,7 @@ export default function LiveDraw() {
     const r = await api("/api/prizes");
     const j = await r.json();
     if (r.status === 401 && j.error === "UNAUTHENTICATED") {
-      window.location.replace("/auth/login?next=/live&reason=session");
+      window.location.replace("/auth/login?next=/live&reason=required");
       return;
     }
     if (!r.ok) {

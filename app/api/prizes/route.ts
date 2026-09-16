@@ -125,7 +125,7 @@ export async function GET() {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load prizes.";
-    console.error("[api/prizes] GET failed", { message });
+    if (message !== "UNAUTHENTICATED") console.error("[api/prizes] GET failed", { message });
     return NextResponse.json(
       { error: message },
       { status: message === "UNAUTHENTICATED" ? 401 : 500 },
