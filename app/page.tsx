@@ -196,6 +196,13 @@ export default function Home() {
             p.scoring_settings?.deadline_mode === "SUNDAY_10AM_PT"
               ? "SUNDAY_10AM_PT"
               : "GAME_KICKOFF",
+          playoffStartsAt:
+            p.pool_type === "PLAYOFF_FANTASY"
+              ? (b.rounds || [])
+                  .filter((round: any) => round.pool_id === p.id && round.starts_at)
+                  .sort((a: any, b: any) => Number(a.round_order) - Number(b.round_order))[0]
+                  ?.starts_at
+              : undefined,
         }));
         const mappedEntries: Entry[] = (b.entries || []).map((e: any) => ({
           id: e.id,
@@ -488,21 +495,18 @@ export default function Home() {
       const weekGames = games.filter((game) => game.week === currentWeek);
       if (pool.type === "PLAYOFF_FANTASY") {
         const missing = Math.max(0, 6 - (fantasyPickCounts[entry.id] || 0));
-        if (!missing) continue;
-        const nextKickoff = games
-          .filter(
-            (game) =>
-              game.status === "SCHEDULED" &&
-              new Date(game.kickoff).getTime() > nowMs,
-          )
-          .map((game) => new Date(game.kickoff).getTime())
-          .sort((a, b) => a - b)[0];
+        const playoffStart = pool.playoffStartsAt
+          ? new Date(pool.playoffStartsAt).getTime()
+          : null;
+        // Playoff Fantasy is dormant until the postseason schedule has a real
+        // start date. Never use a regular-season NFL kickoff as its deadline.
+        if (!missing || !playoffStart || !Number.isFinite(playoffStart) || playoffStart <= nowMs) continue;
         tasks.push({
           pool,
           entry,
           kind: "PLAYOFF_FANTASY",
           missing,
-          deadlineMs: nextKickoff ?? null,
+          deadlineMs: playoffStart,
         });
         continue;
       }

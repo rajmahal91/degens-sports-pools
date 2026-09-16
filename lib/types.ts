@@ -13,6 +13,7 @@ export interface Pool {
   season: string;
   registrationClosesAt?: string;
   deadlineMode?: 'GAME_KICKOFF' | 'SUNDAY_10AM_PT';
+  playoffStartsAt?: string;
 }
 
 export interface Entry {
