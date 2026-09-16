@@ -174,3 +174,6 @@ The app tracks Interac e-Transfer and cash submissions and commissioner verifica
 - Configure actual NHL/NBA bracket pools and team fields before opening registration.
 - Test LiveKit host/viewer behavior on desktop and mobile.
 - Add privacy policy, contest rules, refund terms, and jurisdiction/payment compliance review before accepting public paid entries.
+
+
+**Public app name:** Sports Syndicate Fantasy
