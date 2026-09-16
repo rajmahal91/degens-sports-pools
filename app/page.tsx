@@ -78,6 +78,29 @@ type LeaderboardRow = {
   }>;
 };
 
+type DashboardPrize = {
+  id: string;
+  pool_id: string;
+  title: string;
+  status: string;
+  scheduled_draw_at: string | null;
+  week: number | null;
+  prize_draws?: Array<{ drawn_at: string | null; winner_name: string | null }>;
+};
+
+function countdown(targetMs: number | null, nowMs: number) {
+  if (!targetMs) return "Deadline unavailable";
+  const difference = targetMs - nowMs;
+  if (difference <= 0) return "Deadline passed";
+  const totalMinutes = Math.floor(difference / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h remaining`;
+  if (hours > 0) return `${hours}h ${minutes}m remaining`;
+  return `${Math.max(1, minutes)}m remaining`;
+}
+
 export default function Home() {
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const [tab, setTab] = useState<
@@ -109,6 +132,7 @@ export default function Home() {
   const [savingSurvivor, setSavingSurvivor] = useState(false);
   const [pickem, setPickem] = useState<PickemSelection[]>([]);
   const [pickemSubmitted, setPickemSubmitted] = useState(false);
+  const [fantasyPickCounts, setFantasyPickCounts] = useState<Record<string, number>>({});
   const [activeEntry, setActiveEntry] = useState("entry-r91");
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const [pickMode, setPickMode] = useState<"survivor" | "pickem" | "fantasy">(
@@ -126,6 +150,9 @@ export default function Home() {
   const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
+  const [dashboardPrizes, setDashboardPrizes] = useState<DashboardPrize[]>([]);
+  const [dashboardStandingRows, setDashboardStandingRows] = useState<LeaderboardRow[]>([]);
+  const [dashboardStandingPool, setDashboardStandingPool] = useState<Pool | null>(null);
   const [account, setAccount] = useState<{
     email: string;
     displayName: string;
@@ -226,6 +253,13 @@ export default function Home() {
         if (mappedGames.length) setGames(mappedGames);
         setSurvivorPicks(mappedSurvivor);
         setPickem(mappedPickem);
+        setFantasyPickCounts(
+          (b.fantasy || []).reduce((counts: Record<string, number>, pick: any) => {
+            const entryId = String(pick.entry_id || "");
+            if (entryId) counts[entryId] = (counts[entryId] || 0) + 1;
+            return counts;
+          }, {}),
+        );
         const openWeek = Number(b.currentWeek) || 1;
         setCurrentWeek(openWeek);
         setPickWeek(openWeek);
@@ -316,6 +350,53 @@ export default function Home() {
     return () => controller.abort();
   }, [tab, supabaseConfigured, pools, leaderboardType, leaderboardPoolId, leaderboardWeek]);
 
+  useEffect(() => {
+    if (!connected || tab !== "home") return;
+    const controller = new AbortController();
+    const priorityPool = pools.find(
+      (pool) =>
+        entries.some((entry) => entry.poolId === pool.id) &&
+        ["SURVIVOR", "PICKEM", "PLAYOFF_FANTASY"].includes(pool.type),
+    );
+
+    fetch("/api/prizes", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return { prizes: [] };
+        return response.json();
+      })
+      .then((body) => setDashboardPrizes(body.prizes || []))
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === "AbortError"))
+          setDashboardPrizes([]);
+      });
+
+    if (!priorityPool) {
+      setDashboardStandingPool(null);
+      setDashboardStandingRows([]);
+      return () => controller.abort();
+    }
+    const weekQuery = priorityPool.type === "PICKEM" ? `&week=${currentWeek}` : "";
+    fetch(
+      `/api/leaderboard?poolId=${encodeURIComponent(priorityPool.id)}${weekQuery}`,
+      { signal: controller.signal, cache: "no-store" },
+    )
+      .then(async (response) => {
+        if (!response.ok) return { rows: [] };
+        return response.json();
+      })
+      .then((body) => {
+        setDashboardStandingPool(priorityPool);
+        setDashboardStandingRows(body.rows || []);
+      })
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setDashboardStandingPool(priorityPool);
+          setDashboardStandingRows([]);
+        }
+      });
+    return () => controller.abort();
+  }, [connected, tab, pools, entries, currentWeek]);
+
   const survivorPoolIds = new Set(
     pools
       .filter((p) => p.type === "SURVIVOR" && p.sport === "NFL")
@@ -385,6 +466,118 @@ export default function Home() {
         detail: row.alive ? "Alive" : "Eliminated",
         alive: row.alive,
       }));
+
+  const dashboardTasks = useMemo(() => {
+    const tasks: Array<{
+      pool: Pool;
+      entry: Entry;
+      kind: "SURVIVOR" | "PICKEM" | "PLAYOFF_FANTASY";
+      missing: number;
+      deadlineMs: number | null;
+    }> = [];
+    for (const entry of entries) {
+      if (entry.status !== "ACTIVE") continue;
+      const pool = pools.find((candidate) => candidate.id === entry.poolId);
+      if (
+        !pool ||
+        !["SURVIVOR", "PICKEM", "PLAYOFF_FANTASY"].includes(pool.type)
+      )
+        continue;
+      const weekGames = games.filter((game) => game.week === currentWeek);
+      if (pool.type === "PLAYOFF_FANTASY") {
+        const missing = Math.max(0, 6 - (fantasyPickCounts[entry.id] || 0));
+        if (!missing) continue;
+        const nextKickoff = games
+          .filter(
+            (game) =>
+              game.status === "SCHEDULED" &&
+              new Date(game.kickoff).getTime() > nowMs,
+          )
+          .map((game) => new Date(game.kickoff).getTime())
+          .sort((a, b) => a - b)[0];
+        tasks.push({
+          pool,
+          entry,
+          kind: "PLAYOFF_FANTASY",
+          missing,
+          deadlineMs: nextKickoff ?? null,
+        });
+        continue;
+      }
+      if (!weekGames.length) continue;
+      if (pool.type === "SURVIVOR") {
+        const hasPick = survivorPicks.some(
+          (pick) => pick.entryId === entry.id && pick.week === currentWeek,
+        );
+        if (hasPick) continue;
+        const openKickoffs = weekGames
+          .filter((game) => game.status === "SCHEDULED")
+          .map((game) => new Date(game.kickoff).getTime())
+          .filter((time) => Number.isFinite(time) && time > nowMs)
+          .sort((a, b) => a - b);
+        tasks.push({
+          pool,
+          entry,
+          kind: "SURVIVOR",
+          missing: 1,
+          deadlineMs: openKickoffs[0] ?? null,
+        });
+        continue;
+      }
+      const gameIds = new Set(weekGames.map((game) => game.id));
+      const completed = pickem.filter(
+        (pick) => pick.entryId === entry.id && gameIds.has(pick.gameId),
+      ).length;
+      const missing = Math.max(0, weekGames.length - completed);
+      if (!missing) continue;
+      const openLocks = weekGames
+        .filter(
+          (game) =>
+            !pickem.some(
+              (pick) => pick.entryId === entry.id && pick.gameId === game.id,
+            ),
+        )
+        .map((game) => pickemLockTime(game, weekGames, pool.deadlineMode))
+        .filter((time) => Number.isFinite(time) && time > nowMs)
+        .sort((a, b) => a - b);
+      tasks.push({
+        pool,
+        entry,
+        kind: "PICKEM",
+        missing,
+        deadlineMs: openLocks[0] ?? null,
+      });
+    }
+    return tasks.sort(
+      (a, b) =>
+        (a.deadlineMs ?? Number.MAX_SAFE_INTEGER) -
+        (b.deadlineMs ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [entries, pools, games, currentWeek, survivorPicks, pickem, fantasyPickCounts, nowMs]);
+
+  const primaryTask = dashboardTasks[0];
+  const upcomingPrize = dashboardPrizes
+    .filter(
+      (prize) =>
+        !prize.prize_draws?.length &&
+        !["DRAWN", "COMPLETE", "CANCELLED"].includes(prize.status),
+    )
+    .sort((a, b) => {
+      const left = a.scheduled_draw_at
+        ? new Date(a.scheduled_draw_at).getTime()
+        : Number.MAX_SAFE_INTEGER;
+      const right = b.scheduled_draw_at
+        ? new Date(b.scheduled_draw_at).getTime()
+        : Number.MAX_SAFE_INTEGER;
+      return left - right;
+    })[0];
+  const recentSurvivorResults = [...survivorPicks]
+    .filter((pick) => pick.week <= currentWeek)
+    .sort((a, b) => b.week - a.week)
+    .slice(0, 3);
+  const dashboardTopRows = dashboardStandingRows.slice(0, 3);
+  const dashboardIdentity =
+    account?.displayName || account?.username || account?.email?.split("@")[0] || "Player";
 
   function selectSurvivor(gameId: string, teamCode: string, teamName: string) {
     if (!activeSurvivor) return;
@@ -589,115 +782,256 @@ export default function Home() {
       </header>
 
       {tab === "home" && (
-        <section className="stack">
-          <div className="hero">
-            <span className="eyebrow">
-              {role === "COMMISSIONER"
-                ? "COMMISSIONER DASHBOARD"
-                : "WELCOME BACK"}
-            </span>
-            <h1>
-              {role === "COMMISSIONER"
-                ? "Run every pool from one place."
-                : "Your pools, picks and prizes in one place."}
-            </h1>
-            <p>
-              {role === "COMMISSIONER"
-                ? "Entries, picks, deadlines, standings and prize draws."
-                : "Survivor, Pick’em, playoff fantasy, brackets and live draws."}
-            </p>
+        <section className="stack smartDashboard">
+          <div className="dashboardWelcome">
+            <div>
+              <span className="eyebrow">
+                {role === "COMMISSIONER" ? "COMMISSIONER CONTROL ROOM" : `WEEK ${currentWeek}`}
+              </span>
+              <h1>
+                {role === "COMMISSIONER"
+                  ? "Everything under control."
+                  : `Welcome back, ${dashboardIdentity}.`}
+              </h1>
+              <p>
+                {role === "COMMISSIONER"
+                  ? "Manage leagues, entries, deadlines and live prize draws."
+                  : "Your next move, standings and prizes are ready below."}
+              </p>
+            </div>
+            <div className="weekBadge">
+              <small>CURRENT</small>
+              <strong>{currentWeek}</strong>
+              <span>WEEK</span>
+            </div>
           </div>
-          <nav className="homeQuickActions" aria-label="Quick actions">
-            {role === "COMMISSIONER" ? (
-              <>
-                <a href="/leagues/new">
-                  <span>＋</span>
-                  <strong>Create League</strong>
-                  <small>Start a new pool</small>
-                </a>
-                <a href="/prizes?mode=commissioner">
-                  <span>◇</span>
-                  <strong>Prize Centre</strong>
-                  <small>Manage prizes and draws</small>
-                </a>
-                <a href="/live?host=1">
-                  <span>●</span>
-                  <strong>Go Live</strong>
-                  <small>Broadcast a prize draw</small>
-                </a>
-                <a href="/join">
-                  <span>→</span>
-                  <strong>Join League</strong>
-                  <small>Enter an invitation code</small>
-                </a>
-              </>
-            ) : (
-              <>
-                <a href="/join">
-                  <span>＋</span>
-                  <strong>Join League</strong>
-                  <small>Enter your invitation code</small>
-                </a>
-                <a href="/live?viewer=1">
-                  <span>●</span>
-                  <strong>Watch Live Draw</strong>
-                  <small>Enter a meeting code</small>
-                </a>
-                <a href="/prizes">
-                  <span>◇</span>
-                  <strong>Prizes</strong>
-                  <small>Upcoming draws and winners</small>
-                </a>
-                <a href={account ? "/account" : "/auth/login"}>
-                  <span>○</span>
-                  <strong>My Account</strong>
-                  <small>{account ? account.username ? `@${account.username}` : account.email : "Sign in or create account"}</small>
-                </a>
-              </>
-            )}
-          </nav>
+
           {role === "PLAYER" ? (
             <>
-              <div className="statsGrid">
+              {loading ? (
+                <div className="actionCard loadingAction">
+                  <span className="actionIcon">•••</span>
+                  <div>
+                    <span className="actionLabel">LOADING YOUR DASHBOARD</span>
+                    <strong>Checking your picks and deadlines…</strong>
+                  </div>
+                </div>
+              ) : signedOut ? (
+                <div className="actionCard signInAction">
+                  <span className="actionIcon">→</span>
+                  <div>
+                    <span className="actionLabel">YOUR PRIVATE DASHBOARD</span>
+                    <strong>Sign in to see your leagues and required picks.</strong>
+                    <small>Your pools remain private to your account.</small>
+                  </div>
+                  <a className="dashboardPrimary" href="/auth/login">Sign In</a>
+                </div>
+              ) : primaryTask ? (
+                <div className={`actionCard ${primaryTask.deadlineMs ? "urgent" : "overdue"}`}>
+                  <span className="actionIcon">!</span>
+                  <div className="actionCopy">
+                    <span className="actionLabel">NEXT REQUIRED ACTION</span>
+                    <strong>
+                      {primaryTask.kind === "SURVIVOR"
+                        ? `Make your Week ${currentWeek} Survivor pick`
+                        : primaryTask.kind === "PICKEM"
+                          ? `Finish ${primaryTask.missing} Pick’em selection${primaryTask.missing === 1 ? "" : "s"}`
+                          : `Fill ${primaryTask.missing} playoff fantasy roster spot${primaryTask.missing === 1 ? "" : "s"}`}
+                    </strong>
+                    <small>{primaryTask.pool.name} · {primaryTask.entry.entryName}</small>
+                    <div className="deadlineLine">
+                      <b>{countdown(primaryTask.deadlineMs, nowMs)}</b>
+                      {primaryTask.deadlineMs && <span>{when(new Date(primaryTask.deadlineMs).toISOString())}</span>}
+                    </div>
+                  </div>
+                  <button className="dashboardPrimary" onClick={() => openPoolPicks(primaryTask.pool)}>
+                    Make Your Pick
+                  </button>
+                </div>
+              ) : entries.length ? (
+                <div className="actionCard completeAction">
+                  <span className="actionIcon">✓</span>
+                  <div>
+                    <span className="actionLabel">ALL CAUGHT UP</span>
+                    <strong>Your current picks are submitted.</strong>
+                    <small>We’ll show your next required action here.</small>
+                  </div>
+                  <button className="dashboardSecondary" onClick={() => setTab("pools")}>Review Picks</button>
+                </div>
+              ) : (
+                <div className="actionCard joinAction">
+                  <span className="actionIcon">＋</span>
+                  <div>
+                    <span className="actionLabel">GET STARTED</span>
+                    <strong>Join your first league.</strong>
+                    <small>Use the invitation code from your commissioner.</small>
+                  </div>
+                  <a className="dashboardPrimary" href="/join">Join League</a>
+                </div>
+              )}
+
+              <div className="dashboardStats" aria-label="Your weekly overview">
                 <div>
-                  <b>{mySurvivorEntries.length}</b>
-                  <span>Survivor entries</span>
+                  <span>Needs action</span>
+                  <strong className={dashboardTasks.length ? "dangerText" : "successText"}>{dashboardTasks.length}</strong>
                 </div>
                 <div>
-                  <b>
-                    {currentPickemCount}/{currentGames.length}
-                  </b>
-                  <span>Pick’em made</span>
+                  <span>Active entries</span>
+                  <strong>{entries.filter((entry) => entry.status === "ACTIVE").length}</strong>
                 </div>
                 <div>
-                  <b>{pools.length}</b>
-                  <span>Active pools</span>
+                  <span>Your leagues</span>
+                  <strong>{pools.length}</strong>
                 </div>
               </div>
-              <div className="alert">
-                <strong>Week {currentWeek} is open</strong>
-                <span>
-                  Make Survivor and Pick’em selections. Each game locks at
-                  kickoff.
-                </span>
+
+              <div className="dashboardGrid">
+                <article className="dashboardPanel standingsPanel">
+                  <div className="dashboardPanelHeader">
+                    <div>
+                      <span className="panelKicker">STANDINGS</span>
+                      <h2>{dashboardStandingPool?.name || "Your leaderboard"}</h2>
+                    </div>
+                    {dashboardStandingPool && (
+                      <button
+                        onClick={() => {
+                          setLeaderboardType(dashboardStandingPool.type as LeaderboardType);
+                          setLeaderboardPoolId(dashboardStandingPool.id);
+                          setLeaderboardWeek(
+                            dashboardStandingPool.type === "PICKEM" ? currentWeek : null,
+                          );
+                          setTab("leaderboard");
+                        }}
+                      >
+                        View All
+                      </button>
+                    )}
+                  </div>
+                  {dashboardTopRows.length ? (
+                    <div className="standingPreview">
+                      {dashboardTopRows.map((row) => (
+                        <div key={row.entryId}>
+                          <b>{row.rank}</b>
+                          <span>{row.name}</span>
+                          <small>{row.detail}</small>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="dashboardEmpty">Standings will appear after results are graded.</p>
+                  )}
+                </article>
+
+                <article className="dashboardPanel prizePreview">
+                  <div className="dashboardPanelHeader">
+                    <div>
+                      <span className="panelKicker">NEXT PRIZE DRAW</span>
+                      <h2>{upcomingPrize?.title || "No draw scheduled"}</h2>
+                    </div>
+                    <a href="/prizes">View Prizes</a>
+                  </div>
+                  {upcomingPrize ? (
+                    <>
+                      <div className="prizeDateBadge">
+                        <strong>{upcomingPrize.week ? `WEEK ${upcomingPrize.week}` : "UPCOMING"}</strong>
+                        <span>
+                          {upcomingPrize.scheduled_draw_at
+                            ? when(upcomingPrize.scheduled_draw_at)
+                            : "Date to be announced"}
+                        </span>
+                      </div>
+                      <p>
+                        {pools.find((pool) => pool.id === upcomingPrize.pool_id)?.name || "Your league"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="dashboardEmpty">Your commissioner’s next prize will appear here.</p>
+                  )}
+                </article>
+              </div>
+
+              <div className="dashboardGrid lowerDashboardGrid">
+                <article className="dashboardPanel">
+                  <div className="dashboardPanelHeader">
+                    <div>
+                      <span className="panelKicker">RECENT RESULTS</span>
+                      <h2>Your Survivor picks</h2>
+                    </div>
+                  </div>
+                  {recentSurvivorResults.length ? (
+                    <div className="resultPreview">
+                      {recentSurvivorResults.map((pick) => {
+                        const entry = entries.find((candidate) => candidate.id === pick.entryId);
+                        return (
+                          <div key={`${pick.entryId}-${pick.week}`}>
+                            <span>W{pick.week}</span>
+                            <strong>{pick.teamName}</strong>
+                            <small>{entry?.entryName}</small>
+                            <b className={`result${pick.result || "PENDING"}`}>{pick.result || "PENDING"}</b>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="dashboardEmpty">Your completed picks will appear here.</p>
+                  )}
+                </article>
+
+                <article className="dashboardPanel updatePanel">
+                  <span className="panelKicker">LEAGUE UPDATE</span>
+                  <h2>Week {currentWeek} is open</h2>
+                  <p>Submit selections early. Games lock according to your league’s deadline settings.</p>
+                  <button onClick={() => setTab("pools")}>Open My Pools</button>
+                </article>
               </div>
             </>
           ) : (
-            <div className="statsGrid">
-              <div>
-                <b>{entries.length}</b>
-                <span>Demo entries</span>
+            <>
+              <div className="dashboardStats commissionerStats">
+                <div><span>Managed leagues</span><strong>{manageablePoolIds.length}</strong></div>
+                <div><span>Total entries</span><strong>{entries.length}</strong></div>
+                <div><span>Current week</span><strong>{currentWeek}</strong></div>
               </div>
-              <div>
-                  <b>{manageablePoolIds.length}</b>
-                  <span>Managed pools</span>
-              </div>
-              <div>
-                <b>{currentWeek}</b>
-                <span>Current week</span>
-              </div>
-            </div>
+              <article className="dashboardPanel commissionerPanel">
+                <div className="dashboardPanelHeader">
+                  <div>
+                    <span className="panelKicker">YOUR LEAGUES</span>
+                    <h2>Commissioner overview</h2>
+                  </div>
+                  <a href="/leagues/new">Create League</a>
+                </div>
+                <div className="commissionerLeagueList">
+                  {pools.filter((pool) => manageablePoolIds.includes(pool.id)).slice(0, 4).map((pool) => (
+                    <a href={`/leagues/${pool.id}`} key={pool.id}>
+                      <span><strong>{pool.name}</strong><small>{pool.type.replaceAll("_", " ")} · {pool.season}</small></span>
+                      <b>Manage →</b>
+                    </a>
+                  ))}
+                  {!manageablePoolIds.length && (
+                    <p className="dashboardEmpty">Create a league to start your commissioner dashboard.</p>
+                  )}
+                </div>
+              </article>
+            </>
           )}
+
+          <nav className="homeQuickActions" aria-label="Quick actions">
+            {role === "COMMISSIONER" ? (
+              <>
+                <a href="/leagues/new"><span>＋</span><strong>Create League</strong><small>Start a new pool</small></a>
+                <a href="/prizes?mode=commissioner"><span>◇</span><strong>Prize Centre</strong><small>Manage prizes and draws</small></a>
+                <a href="/live?host=1"><span>●</span><strong>Go Live</strong><small>Broadcast a prize draw</small></a>
+                <a href="/join"><span>→</span><strong>Join League</strong><small>Enter an invitation code</small></a>
+              </>
+            ) : (
+              <>
+                <a href="/join"><span>＋</span><strong>Join League</strong><small>Enter your invitation code</small></a>
+                <a href="/live?viewer=1"><span>●</span><strong>Watch Live</strong><small>Join a prize draw</small></a>
+                <a href="/prizes"><span>◇</span><strong>Prize Centre</strong><small>Draws and winners</small></a>
+                <a href={account ? "/account" : "/auth/login"}><span>○</span><strong>My Account</strong><small>{account ? account.username ? `@${account.username}` : account.email : "Sign in or create account"}</small></a>
+              </>
+            )}
+          </nav>
         </section>
       )}
 
