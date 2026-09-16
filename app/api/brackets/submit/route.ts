@@ -1,31 +1,5 @@
 import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import { requireUser } from "@/lib/auth";
-
-const teams = {
-  NHL: ["WPG", "STL", "DAL", "COL", "VGK", "MIN", "LA", "EDM", "TOR", "OTT", "TB", "FLA", "WSH", "MTL", "CAR", "NJ"],
-  NBA: ["OKC", "MEM", "DEN", "LAC", "LAL", "MIN", "GSW", "HOU", "CLE", "MIA", "BOS", "ORL", "NYK", "DET", "IND", "MIL"],
-} as const;
-
-function bracketRows(poolId: string, sport: "NHL" | "NBA") {
-  const ids = Array.from({ length: 15 }, () => randomUUID());
-  const offsets = [0, 8, 12, 14];
-  const rows: any[] = [];
-  for (let round = 1; round <= 4; round++) {
-    const count = 16 / 2 ** round;
-    for (let number = 1; number <= count; number++) {
-      const index = rows.length;
-      rows.push({
-        id: ids[index], pool_id: poolId, round_number: round, matchup_number: number,
-        team1: round === 1 ? teams[sport][(number - 1) * 2] : null,
-        team2: round === 1 ? teams[sport][(number - 1) * 2 + 1] : null,
-        next_matchup_id: round < 4 ? ids[offsets[round] + Math.ceil(number / 2) - 1] : null,
-        advance_to_slot: round < 4 ? (number % 2 ? 1 : 2) : null,
-      });
-    }
-  }
-  return rows;
-}
 
 export async function GET(request: Request) {
   try {
@@ -41,14 +15,8 @@ export async function GET(request: Request) {
     const { data: entry } = await supabase.from("entries").select("id,entry_name").eq("pool_id", selected.id).eq("user_id", user.id).eq("entry_status", "ACTIVE").maybeSingle();
     if (!entry) return NextResponse.json({ pools, pool: selected, matchups: [], picks: [], error: "Join this bracket league before submitting a bracket." });
     let { data: matchups } = await supabase.from("bracket_matchups").select("*").eq("pool_id", selected.id).order("round_number").order("matchup_number");
-    if (!matchups?.length) {
-      const rows = bracketRows(selected.id, selected.sport as "NHL" | "NBA");
-      const inserted = await supabase.from("bracket_matchups").insert(rows).select("*");
-      if (inserted.error) throw inserted.error;
-      matchups = inserted.data || rows;
-    }
     const { data: picks } = await supabase.from("bracket_picks").select("matchup_id,predicted_winner,predicted_series_length,points_awarded").eq("entry_id", entry.id);
-    return NextResponse.json({ pools, pool: selected, entry, matchups, picks: picks || [] });
+    return NextResponse.json({ pools, pool: selected, entry, matchups: matchups || [], picks: picks || [], matchupsConfirmed: Boolean(matchups?.length) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load bracket.";
     return NextResponse.json({ error: message }, { status: message === "UNAUTHENTICATED" ? 401 : 400 });
