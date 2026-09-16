@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { pickLockAt } from '@/lib/sports/nfl-operations';
+import { recordPickReceipt } from '@/lib/picks/audit';
 
 export async function POST(request: Request) {
   try {
@@ -18,9 +19,21 @@ export async function POST(request: Request) {
     ]);
     const lockAt=pickLockAt(game,weekGames||[],pool?.scoring_settings?.deadline_mode||'GAME_KICKOFF');
     if (game.status !== 'SCHEDULED' || lockAt.getTime() <= Date.now()) return NextResponse.json({ error: 'This week is already locked.' }, { status: 400 });
+    const { data: existing } = await supabase.from('pickem_picks').select('*').eq('entry_id', entryId).eq('game_id', gameId).maybeSingle();
     const { data, error } = await supabase.from('pickem_picks').upsert({ entry_id: entryId, game_id: gameId, selected_team: teamCode }, { onConflict: 'entry_id,game_id' }).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ pick: data });
+    const receipt = await recordPickReceipt({
+      userId: user.id,
+      entryId,
+      poolId: entry.pool_id,
+      pickType: 'PICKEM',
+      pickKey: `game-${gameId}`,
+      action: existing ? 'CHANGED' : 'SUBMITTED',
+      beforeState: existing,
+      afterState: data,
+      submittedAt: data.submitted_at,
+    });
+    return NextResponse.json({ pick: data, receipt });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unknown error' }, { status: 401 });
   }

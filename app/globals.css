@@ -84,6 +84,59 @@ body {
   flex-direction: column;
   gap: 16px;
 }
+.pickReceipts {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 18px;
+  padding: 16px;
+}
+.pickReceiptsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pickReceiptsHeader h2 {
+  margin: 5px 0 0;
+  font-size: 20px;
+}
+.receiptList {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.receiptRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.receiptRow > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.receiptRow > div:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+.receiptRow span,
+.receiptRow small,
+.receiptRow b {
+  color: var(--muted);
+  font-size: 12px;
+}
+.receiptRow strong {
+  font-size: 14px;
+}
+.receiptRow b {
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 .hero {
   padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
   border: 1px solid var(--line);

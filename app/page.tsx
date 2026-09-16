@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import PickReceipts from "@/components/PickReceipts";
 import {
   entries as seedEntries,
   leaderboard,
@@ -144,6 +145,7 @@ export default function Home() {
     null,
   );
   const [notice, setNotice] = useState<string | null>(null);
+  const [receiptRefreshToken, setReceiptRefreshToken] = useState(0);
   const [leaderboardType, setLeaderboardType] = useState<LeaderboardType>("SURVIVOR");
   const [leaderboardPoolId, setLeaderboardPoolId] = useState("");
   const [leaderboardWeek, setLeaderboardWeek] = useState<number | null>(null);
@@ -624,6 +626,7 @@ export default function Home() {
         ]);
         setPendingSurvivor(null);
         setNotice(`Week ${pickWeek} pick confirmed.`);
+        setReceiptRefreshToken((value) => value + 1);
         return;
       }
       const j = await r.json();
@@ -666,7 +669,10 @@ export default function Home() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ entryId, gameId, teamCode }),
       });
-      if (r.ok) return;
+      if (r.ok) {
+        setReceiptRefreshToken((value) => value + 1);
+        return;
+      }
       const j = await r.json();
       setPickem((prev) => {
         const current = prev.find(
@@ -1163,6 +1169,10 @@ export default function Home() {
               {activePoolForPicks.type.replaceAll("_", " ")} · Week {pickWeek}
             </span>
           </div>
+          <PickReceipts
+            entryId={pickMode === "survivor" ? activeSurvivor?.id : pickemEntry?.id}
+            refreshToken={receiptRefreshToken}
+          />
           {(pickMode === "survivor" || pickMode === "pickem") && (
             <nav className="weekTabs" aria-label="Choose an NFL week">
               {Array.from({ length: 18 }, (_, index) => index + 1).map((week) => {

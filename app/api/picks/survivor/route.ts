@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { pickLockAt } from '@/lib/sports/nfl-operations';
+import { recordPickReceipt } from '@/lib/picks/audit';
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
       supabase.from('games').select('kickoff_at').eq('sport','NFL').eq('week',Number(week)).eq('season',game.season),
     ]);
     const mode=pool?.scoring_settings?.deadline_mode||'GAME_KICKOFF';
-    const {data:existing}=await supabase.from('survivor_picks').select('id,game_id,team_code').eq('entry_id',entryId).eq('week',Number(week)).maybeSingle();
+    const {data:existing}=await supabase.from('survivor_picks').select('*').eq('entry_id',entryId).eq('week',Number(week)).maybeSingle();
     if(existing){
       const {data:existingGame}=await supabase.from('games').select('id,kickoff_at,status').eq('id',existing.game_id).single();
       if(!existingGame)return NextResponse.json({error:'The saved game could not be verified.'},{status:409});
@@ -34,7 +35,18 @@ export async function POST(request: Request) {
     if (used?.length) return NextResponse.json({ error: `${teamCode} was already used in Week ${used[0].week}.` }, { status: 400 });
     const { data, error } = await supabase.from('survivor_picks').upsert({ entry_id: entryId, game_id: gameId, week: Number(week), team_code: teamCode }, { onConflict: 'entry_id,week' }).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ pick: data });
+    const receipt = await recordPickReceipt({
+      userId: user.id,
+      entryId,
+      poolId: entry.pool_id,
+      pickType: 'SURVIVOR',
+      pickKey: `week-${week}`,
+      action: existing ? 'CHANGED' : 'SUBMITTED',
+      beforeState: existing,
+      afterState: data,
+      submittedAt: data.submitted_at,
+    });
+    return NextResponse.json({ pick: data, receipt });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unknown error' }, { status: 401 });
   }
