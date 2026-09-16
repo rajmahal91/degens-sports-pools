@@ -1,6 +1,6 @@
-# Degens Sports Pools v0.7
+# Sports Syndicate Fantasy v0.7
 
-A mobile-first multi-sport pool platform for NFL Survivor, NFL Pick'em, NFL Playoff Fantasy, NHL/NBA playoff brackets, entry-fee tracking, prizes, verified random draws, and in-app live broadcasts.
+A mobile-first multi-sport fantasy platform for NFL Survivor, NFL Pick'em, NFL Playoff Fantasy, NHL/NBA playoff brackets, entry-fee tracking, prizes, verified random draws, and in-app live broadcasts.
 
 ## v0.7 beta launch additions
 
