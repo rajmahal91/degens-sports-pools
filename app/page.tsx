@@ -741,7 +741,10 @@ export default function Home() {
     <main className="shell">
       <header className="topbar">
         <a className="homeBrand" href="/" aria-label="Sports Syndicate Fantasy home">
-          <div className="brand">SPORTS SYNDICATE</div>
+          <div className="brand homeBrandTitle">
+            <span className="brandSports">SPORTS</span>{" "}
+            <span className="brandSyndicate">SYNDICATE</span>
+          </div>
           <div className="subbrand">FANTASY</div>
         </a>
         <div className="topActions">

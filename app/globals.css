@@ -59,6 +59,16 @@ body {
     0 3px 8px rgba(0, 0, 0, 0.42);
   white-space: nowrap;
 }
+.homeBrandTitle {
+  -webkit-text-stroke: 0;
+  text-shadow: 0 3px 9px rgba(0, 0, 0, 0.48);
+}
+.homeBrandTitle .brandSports {
+  color: #2d8cff;
+}
+.homeBrandTitle .brandSyndicate {
+  color: var(--accent);
+}
 .subbrand {
   margin-top: 5px;
   color: var(--accent);
