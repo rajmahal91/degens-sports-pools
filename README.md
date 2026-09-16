@@ -177,3 +177,5 @@ The app tracks Interac e-Transfer and cash submissions and commissioner verifica
 
 
 **Public app name:** Sports Syndicate Fantasy
+
+<!-- Automated playoff tracking is enabled in production. -->
