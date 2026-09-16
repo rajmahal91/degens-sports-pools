@@ -35,6 +35,7 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       memberIds.length?supabase.from('profiles').select('id,display_name,username').in('id',[...new Set(memberIds)]):Promise.resolve({data:[]}),
       supabase.from('commissioner_audit_log').select('id,commissioner_id,action,entity_type,entity_id,payload,created_at').eq('organization_id',pool.organization_id).order('created_at',{ascending:false}).limit(40),
     ]);
+    const {data:history}=await supabase.from('pools').select('id,name,sport,pool_type,season,is_active,created_at').eq('organization_id',pool.organization_id).eq('sport',pool.sport).eq('pool_type',pool.pool_type).eq('name',pool.name).order('season',{ascending:false});
     const profileById=new Map((profiles||[]).map(profile=>[profile.id,profile]));
     const membersWithProfiles=(members||[]).map(member=>({...member,profile:profileById.get(member.user_id)||null}));
     const entriesWithProfiles=(entries||[]).map(entry=>({...entry,profile:profileById.get(entry.user_id)||null}));
@@ -58,7 +59,7 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       return {entry_id:entry.id,entry_name:entry.entry_name,entry_status:entry.entry_status,wins,losses,pending,submitted:entryPicks.length};
     }).sort((a,b)=>Number(b.entry_status==='ACTIVE')-Number(a.entry_status==='ACTIVE')||b.wins-a.wins||a.losses-b.losses||a.entry_name.localeCompare(b.entry_name));
     const visiblePicks=picks.map(pick=>{const game=gameById.get(pick.game_id);return {...pick,week:pick.week??game?.week,locked:!!game&&(game.status!=='SCHEDULED'||new Date(game.kickoff_at).getTime()<=Date.now())};});
-    return NextResponse.json({pool,members:membersWithProfiles,entries:entriesWithProfiles,picks:visiblePicks,games:games||[],standings,latestScoringRun,audit:audit||[]});
+    return NextResponse.json({pool,members:membersWithProfiles,entries:entriesWithProfiles,picks:visiblePicks,games:games||[],standings,latestScoringRun,audit:audit||[],history:history||[]});
   }catch(error){return failure(error);}
 }
 
@@ -89,6 +90,18 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       await supabase.from('league_invitations').update({is_active:false}).eq('pool_id',poolId).eq('is_active',true);
       const {error}=await supabase.from('league_invitations').insert({pool_id:poolId,code_hash:codeHash,code_hint:inviteCode.slice(-4),created_by:user.id});
       if(error) throw error;return NextResponse.json({inviteCode});
+    }
+    if(body.action==='renew_season'){
+      const nextSeason=Number(body.nextSeason)||Number(pool.season)+1;
+      if(!Number.isInteger(nextSeason)||nextSeason<2026||nextSeason>2100)return NextResponse.json({error:'Enter a valid next season.'},{status:400});
+      const nextName=String(pool.name).includes(String(pool.season))?String(pool.name).replace(String(pool.season),String(nextSeason)):`${pool.name} ${nextSeason}`;
+      const {data:existing}=await supabase.from('pools').select('id,name').eq('organization_id',pool.organization_id).eq('sport',pool.sport).eq('pool_type',pool.pool_type).eq('season',nextSeason).maybeSingle();
+      if(existing)return NextResponse.json({error:`A ${nextSeason} league already exists: ${existing.name}.`},{status:409});
+      const {data,error}=await supabase.rpc('create_league',{p_organization_id:pool.organization_id,p_organization_name:'',p_name:nextName,p_sport:pool.sport,p_pool_type:pool.pool_type,p_season:nextSeason,p_entry_fee_cents:0,p_max_entries:pool.max_entries_per_user||1,p_max_participants:pool.max_participants||1000,p_deadline_mode:pool.scoring_settings?.deadline_mode==='SUNDAY_10AM_PT'?'SUNDAY_10AM_PT':'GAME_KICKOFF',p_strict_missed_picks:pool.scoring_settings?.missed_pick_elimination!==false});
+      if(error)throw error;
+      const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'SEASON_RENEWED',entity_type:'pool',entity_id:poolId,payload:{previous_pool_id:poolId,previous_season:pool.season,next_season:nextSeason,new_league:data}});
+      if(auditError)throw auditError;
+      return NextResponse.json({success:true,nextSeason,league:data});
     }
     if(body.action==='deactivate_entry'){
       body.action='update_entry';body.entryStatus='INACTIVE';

@@ -1413,6 +1413,13 @@ p {
   color: var(--muted);
   font-size: 12px;
 }
+.historyRow {
+  text-decoration: none;
+}
+.historyRow b {
+  color: var(--accent);
+  font-size: 11px;
+}
 .topActions {
   display: flex;
   align-items: center;
