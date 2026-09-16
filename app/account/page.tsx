@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import NotificationSettings from "@/components/NotificationSettings";
 
 export default function AccountPage() {
   const [email, setEmail] = useState("");
@@ -83,6 +84,7 @@ export default function AccountPage() {
         </label>
         {message && <div className="notice">{message}</div>}
         <button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Account"}</button>
+        <NotificationSettings />
         <button className="dangerButton" type="button" onClick={signOut}>Sign Out</button>
       </form>
     </main>
