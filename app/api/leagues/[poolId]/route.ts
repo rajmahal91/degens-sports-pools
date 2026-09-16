@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { syncAndGradeNFLWeek } from '@/lib/sports/nfl-operations';
@@ -104,6 +104,20 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'SEASON_RENEWED',entity_type:'pool',entity_id:poolId,payload:{previous_pool_id:poolId,previous_season:pool.season,next_season:nextSeason,new_league:data}});
       if(auditError)throw auditError;
       return NextResponse.json({success:true,nextSeason,league:data});
+    }
+    if(body.action==='confirm_bracket_matchups'){
+      if(pool.pool_type!=='BRACKET'||!['NHL','NBA'].includes(pool.sport))return NextResponse.json({error:'Only NHL and NBA bracket leagues can confirm playoff matchups.'},{status:400});
+      const teams=Array.isArray(body.teams)?body.teams.map((team:any)=>String(team).trim().toUpperCase().replace(/[^A-Z0-9-]/g,'')).filter(Boolean):[];
+      if(teams.length!==16||new Set(teams).size!==16)return NextResponse.json({error:'Enter 16 unique playoff teams, one per line.'},{status:400});
+      const {count}=await supabase.from('bracket_matchups').select('id',{count:'exact',head:true}).eq('pool_id',poolId);
+      if(count)return NextResponse.json({error:'Playoff matchups are already confirmed for this league.'},{status:409});
+      const ids=Array.from({length:15},()=>randomUUID()),offsets=[0,8,12,14],rows:any[]=[];
+      for(let round=1;round<=4;round++)for(let number=1;number<=16/2**round;number++)rows.push({id:ids[rows.length],pool_id:poolId,round_number:round,matchup_number:number,team1:round===1?teams[(number-1)*2]:null,team2:round===1?teams[(number-1)*2+1]:null,next_matchup_id:round<4?ids[offsets[round]+Math.ceil(number/2)-1]:null,advance_to_slot:round<4?(number%2?1:2):null});
+      const {data:matchups,error:matchupError}=await supabase.from('bracket_matchups').insert(rows).select('*');
+      if(matchupError)throw matchupError;
+      const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'BRACKET_MATCHUPS_CONFIRMED',entity_type:'pool',entity_id:poolId,payload:{sport:pool.sport,season:pool.season,teams}});
+      if(auditError)throw auditError;
+      return NextResponse.json({success:true,matchups:matchups||rows});
     }
     if(body.action==='deactivate_entry'){
       body.action='update_entry';body.entryStatus='INACTIVE';
