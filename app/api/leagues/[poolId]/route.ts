@@ -30,6 +30,14 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       supabase.from('league_members').select('pool_id,user_id,role,status').eq('pool_id',poolId).order('role'),
       supabase.from('entries').select('*').eq('pool_id',poolId).order('created_at'),
     ]);
+    const memberIds=[...(members||[]).map(member=>member.user_id),...(entries||[]).map(entry=>entry.user_id)];
+    const [{data:profiles},{data:audit}]=await Promise.all([
+      memberIds.length?supabase.from('profiles').select('id,display_name,username').in('id',[...new Set(memberIds)]):Promise.resolve({data:[]}),
+      supabase.from('commissioner_audit_log').select('id,commissioner_id,action,entity_type,entity_id,payload,created_at').eq('organization_id',pool.organization_id).order('created_at',{ascending:false}).limit(40),
+    ]);
+    const profileById=new Map((profiles||[]).map(profile=>[profile.id,profile]));
+    const membersWithProfiles=(members||[]).map(member=>({...member,profile:profileById.get(member.user_id)||null}));
+    const entriesWithProfiles=(entries||[]).map(entry=>({...entry,profile:profileById.get(entry.user_id)||null}));
     const entryIds=(entries||[]).map(entry=>entry.id);
     let picks:any[]=[];
     if(entryIds.length){
@@ -50,20 +58,25 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       return {entry_id:entry.id,entry_name:entry.entry_name,entry_status:entry.entry_status,wins,losses,pending,submitted:entryPicks.length};
     }).sort((a,b)=>Number(b.entry_status==='ACTIVE')-Number(a.entry_status==='ACTIVE')||b.wins-a.wins||a.losses-b.losses||a.entry_name.localeCompare(b.entry_name));
     const visiblePicks=picks.map(pick=>{const game=gameById.get(pick.game_id);return {...pick,week:pick.week??game?.week,locked:!!game&&(game.status!=='SCHEDULED'||new Date(game.kickoff_at).getTime()<=Date.now())};});
-    return NextResponse.json({pool,members:members||[],entries:entries||[],picks:visiblePicks,games:games||[],standings,latestScoringRun});
+    return NextResponse.json({pool,members:membersWithProfiles,entries:entriesWithProfiles,picks:visiblePicks,games:games||[],standings,latestScoringRun,audit:audit||[]});
   }catch(error){return failure(error);}
 }
 
 export async function PATCH(request:Request,{params}:{params:Promise<{poolId:string}>}){
   try{
-    const {poolId}=await params;const {supabase}=await managerContext(poolId);const body=await request.json();
+    const {poolId}=await params;const {supabase,user,pool}=await managerContext(poolId);const body=await request.json();
     const name=String(body.name||'').trim().slice(0,80);
     const maxEntries=Math.min(100,Math.max(1,Number(body.maxEntries||1)));
     const maxParticipants=Math.min(1000,Math.max(1,Number(body.maxParticipants||1000)));
     if(name.length<2) return NextResponse.json({error:'Enter a league name.'},{status:400});
     const scoringSettings={deadline_mode:body.deadlineMode==='SUNDAY_10AM_PT'?'SUNDAY_10AM_PT':'GAME_KICKOFF',missed_pick_elimination:body.strictMissedPicks!==false};
-    const {data,error}=await supabase.from('pools').update({name,entry_fee_cents:0,max_entries_per_user:maxEntries,max_participants:maxParticipants,scoring_settings:scoringSettings,visibility:body.visibility==='PUBLIC'?'PUBLIC':'INVITE_ONLY'}).eq('id',poolId).select('*').single();
-    if(error) throw error;return NextResponse.json({pool:data});
+    const {data:before}=await supabase.from('pools').select('name,max_entries_per_user,max_participants,scoring_settings,visibility,is_active').eq('id',poolId).single();
+    const update={name,entry_fee_cents:0,max_entries_per_user:maxEntries,max_participants:maxParticipants,scoring_settings:scoringSettings,visibility:body.visibility==='PUBLIC'?'PUBLIC':'INVITE_ONLY',...(typeof body.isActive==='boolean'?{is_active:body.isActive}:{})};
+    const {data,error}=await supabase.from('pools').update(update).eq('id',poolId).select('*').single();
+    if(error) throw error;
+    const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'LEAGUE_SETTINGS_UPDATED',entity_type:'pool',entity_id:poolId,payload:{before,after:update}});
+    if(auditError) throw auditError;
+    return NextResponse.json({pool:data});
   }catch(error){return failure(error);}
 }
 
@@ -78,8 +91,40 @@ export async function POST(request:Request,{params}:{params:Promise<{poolId:stri
       if(error) throw error;return NextResponse.json({inviteCode});
     }
     if(body.action==='deactivate_entry'){
-      const {error}=await supabase.from('entries').update({entry_status:'INACTIVE'}).eq('id',String(body.entryId)).eq('pool_id',poolId);
-      if(error) throw error;return NextResponse.json({success:true});
+      body.action='update_entry';body.entryStatus='INACTIVE';
+    }
+    if(body.action==='update_entry'){
+      const entryId=String(body.entryId||'');
+      const {data:before}=await supabase.from('entries').select('*').eq('id',entryId).eq('pool_id',poolId).maybeSingle();
+      if(!before)return NextResponse.json({error:'Entry not found.'},{status:404});
+      const allowedPayment=['UNPAID','PAID','WAIVED','REFUNDED'];
+      const allowedStatus=['ACTIVE','INACTIVE','ELIMINATED'];
+      const update:any={};
+      if(typeof body.entryName==='string'&&body.entryName.trim())update.entry_name=body.entryName.trim().slice(0,80);
+      if(allowedPayment.includes(String(body.paymentStatus)))update.payment_status=String(body.paymentStatus);
+      if(allowedStatus.includes(String(body.entryStatus))){
+        update.entry_status=String(body.entryStatus);
+        if(update.entry_status==='ACTIVE'){update.elimination_week=null;update.elimination_reason=null;update.eliminated_at=null;}
+      }
+      if(!Object.keys(update).length)return NextResponse.json({error:'Choose a valid entry update.'},{status:400});
+      const {data,error}=await supabase.from('entries').update(update).eq('id',entryId).eq('pool_id',poolId).select('*').single();
+      if(error)throw error;
+      const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'ENTRY_UPDATED',entity_type:'entry',entity_id:entryId,payload:{pool_id:poolId,before,after:data}});
+      if(auditError)throw auditError;
+      return NextResponse.json({success:true,entry:data});
+    }
+    if(body.action==='update_member'){
+      const memberId=String(body.userId||'');
+      const status=['ACTIVE','SUSPENDED','LEFT'].includes(String(body.status))?String(body.status):null;
+      if(!memberId||!status)return NextResponse.json({error:'Choose a valid member status.'},{status:400});
+      const {data:before}=await supabase.from('league_members').select('*').eq('pool_id',poolId).eq('user_id',memberId).maybeSingle();
+      if(!before)return NextResponse.json({error:'Member not found.'},{status:404});
+      if(before.role==='COMMISSIONER'&&status!=='ACTIVE')return NextResponse.json({error:'The lead commissioner cannot be removed from the league.'},{status:400});
+      const {data,error}=await supabase.from('league_members').update({status}).eq('pool_id',poolId).eq('user_id',memberId).select('*').single();
+      if(error)throw error;
+      const {error:auditError}=await supabase.from('commissioner_audit_log').insert({commissioner_id:user.id,organization_id:pool.organization_id,action:'MEMBER_STATUS_UPDATED',entity_type:'league_member',entity_id:poolId,payload:{user_id:memberId,before,after:data}});
+      if(auditError)throw auditError;
+      return NextResponse.json({success:true,member:data});
     }
     if(body.action==='run_scoring'){
       const week=Math.max(1,Math.min(22,Number(body.week)||1));

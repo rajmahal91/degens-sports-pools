@@ -1671,6 +1671,27 @@ p {
   border-radius: 9px;
   padding: 8px 10px;
 }
+.entryManageRow {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.entryControls {
+  display: grid !important;
+  grid-template-columns: minmax(120px, 1fr) 110px 115px auto;
+  gap: 6px !important;
+  flex-direction: row !important;
+  min-width: min(100%, 520px);
+}
+.entryControls input,
+.entryControls select {
+  min-width: 0;
+  background: #0c1118;
+  color: #fff;
+  border: 1px solid #323c4c;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 11px;
+}
 @media (max-width: 760px) {
   .leagueAdminGrid {
     grid-template-columns: 1fr;
@@ -1681,6 +1702,13 @@ p {
   }
   .leagueAdminHero button {
     width: 100%;
+  }
+  .entryControls {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .entryControls button {
+    grid-column: span 2;
   }
   .inviteBanner {
     align-items: flex-start;
