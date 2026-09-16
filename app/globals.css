@@ -1384,6 +1384,35 @@ p {
   color: #ff9aaa;
   font-weight: 900;
 }
+.onboardingSteps {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.onboardingSteps span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+.onboardingSteps .stepActive {
+  color: #fff;
+  border-color: var(--accent);
+}
+.joinAuthActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.inviteShareLink {
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border-radius: 10px;
+  background: #0c1118;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
 .topActions {
   display: flex;
   align-items: center;

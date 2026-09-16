@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,23}$/;
@@ -12,6 +12,12 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [next, setNext] = useState("/");
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("next") || "/";
+    setNext(requested.startsWith("/") && !requested.startsWith("//") ? requested : "/");
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -34,7 +40,7 @@ export default function SignUpPage() {
       if (!availability.available) throw new Error("That username is already taken.");
 
       const supabase = createClient();
-      const emailRedirectTo = `${window.location.origin}/auth/callback`;
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -81,7 +87,7 @@ export default function SignUpPage() {
         </label>
         {message && <div className="notice">{message}</div>}
         <button className="primary" type="submit" disabled={submitting}>{submitting ? "Creating Account…" : "Create Account"}</button>
-        <a href="/auth/login">Already have an account?</a>
+        <a href={`/auth/login?next=${encodeURIComponent(next)}`}>Already have an account?</a>
       </form>
     </main>
   );
