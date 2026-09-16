@@ -2213,6 +2213,34 @@ p {
   color: #8f98a6;
   font-size: 12px;
 }
+.prizeToolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid #272d36;
+  border-radius: 14px;
+  background: #0f1319;
+}
+.prizeToolbar .fieldLabel {
+  min-width: 180px;
+  margin: 0;
+}
+.prizeToolbar button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #394352;
+  border-radius: 10px;
+  background: #1b222d;
+  color: #fff;
+  cursor: pointer;
+}
+.prizeToolbar button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
 .prizeGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -2272,6 +2300,15 @@ p {
   font-size: 10px;
   letter-spacing: 0.12em;
 }
+.drawIntegrityNote {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-left: 3px solid #c8ff35;
+  background: #182018;
+  color: #b7c4b1;
+  font-size: 12px;
+  line-height: 1.45;
+}
 @media (max-width: 800px) {
   .prizeGrid {
     grid-template-columns: 1fr;
@@ -2287,6 +2324,13 @@ p {
   }
   .prizeTop {
     padding: calc(10px + env(safe-area-inset-top, 0px)) 8px 10px;
+  }
+  .prizeToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .prizeToolbar .fieldLabel {
+    min-width: 0;
   }
 }
 
