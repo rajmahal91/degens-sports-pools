@@ -60,7 +60,12 @@ body {
   white-space: nowrap;
 }
 .homeBrandTitle {
-  -webkit-text-stroke: 0;
+  font-family: Impact, Haettenschweiler, "Arial Black", "Arial Narrow Bold", sans-serif;
+  font-weight: 950;
+  font-synthesis: weight;
+  letter-spacing: 0.025em;
+  -webkit-text-stroke: 0.45px currentColor;
+  paint-order: stroke fill;
   text-shadow: 0 3px 9px rgba(0, 0, 0, 0.48);
 }
 .homeBrandTitle .brandSports {
