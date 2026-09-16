@@ -33,6 +33,7 @@ export default function Prizes() {
   const [manualDrafts, setManualDrafts] = useState<Record<string, string>>({});
   const [savingList, setSavingList] = useState<string>("");
   const [deleting, setDeleting] = useState<string>("");
+  const [weekFilter, setWeekFilter] = useState("ALL");
   const [poolId, setPoolId] = useState(""),
     [name, setName] = useState(""),
     [week, setWeek] = useState(1),
@@ -47,6 +48,7 @@ export default function Prizes() {
     return fetch(path, { ...init, headers });
   }
   async function load() {
+    setLoading(true);
     const r = await api("/api/prizes");
     const j = await r.json();
     if (r.status === 401 && j.error === "UNAUTHENTICATED") {
@@ -55,6 +57,7 @@ export default function Prizes() {
     }
     if (!r.ok) {
       setMessage(j.error || "Could not load prizes");
+      setLoading(false);
       return;
     }
     setPrizes(j.prizes || []);
@@ -68,6 +71,7 @@ export default function Prizes() {
         ? requestedPoolId
         : (j.canManagePoolIds || [])[0] || ""),
     );
+    setLoading(false);
   }
   useEffect(() => {
     setCommissionerView(
@@ -200,10 +204,13 @@ export default function Prizes() {
     if (r.ok) await load();
     setDeleting("");
   }
-  const upcoming = prizes.filter(
+  const visiblePrizes = prizes.filter(
+    (p) => weekFilter === "ALL" || String(p.week || "SPECIAL") === weekFilter,
+  );
+  const upcoming = visiblePrizes.filter(
       (p) => !p.prize_draws?.some((d) => d.drawn_at),
     ),
-    past = prizes.filter((p) => p.prize_draws?.some((d) => d.drawn_at));
+    past = visiblePrizes.filter((p) => p.prize_draws?.some((d) => d.drawn_at));
   const manageablePools = pools.filter((p) => manageable.includes(p.id));
   const selectedPool = manageablePools.find((p) => p.id === poolId);
   return (
@@ -334,9 +341,30 @@ export default function Prizes() {
                 <span>Completed</span>
               </div>
               <div>
-                <b>{prizes.reduce((n, p) => n + p.eligible_count, 0)}</b>
+                <b>{visiblePrizes.reduce((n, p) => n + p.eligible_count, 0)}</b>
                 <span>Eligible entries</span>
               </div>
+            </div>
+            <div className="prizeToolbar">
+              <label className="fieldLabel">
+                Show
+                <select
+                  className="textInput"
+                  value={weekFilter}
+                  onChange={(e) => setWeekFilter(e.target.value)}
+                >
+                  <option value="ALL">All weeks</option>
+                  <option value="SPECIAL">Special draws</option>
+                  {Array.from({ length: 18 }, (_, i) => (
+                    <option key={i + 1} value={String(i + 1)}>
+                      Week {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={load} disabled={loading}>
+                {loading ? "Refreshing…" : "Refresh prizes"}
+              </button>
             </div>
             <h2>Upcoming Draws</h2>
             <div className="prizeGrid">
