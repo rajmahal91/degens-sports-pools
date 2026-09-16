@@ -35,7 +35,9 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       memberIds.length?supabase.from('profiles').select('id,display_name,username').in('id',[...new Set(memberIds)]):Promise.resolve({data:[]}),
       supabase.from('commissioner_audit_log').select('id,commissioner_id,action,entity_type,entity_id,payload,created_at').eq('organization_id',pool.organization_id).order('created_at',{ascending:false}).limit(40),
     ]);
-    const {data:history}=await supabase.from('pools').select('id,name,sport,pool_type,season,is_active,created_at').eq('organization_id',pool.organization_id).eq('sport',pool.sport).eq('pool_type',pool.pool_type).eq('name',pool.name).order('season',{ascending:false});
+    const normalizeSeriesName=(value:string)=>value.replace(/\b(?:19|20)\d{2}\b/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+    const {data:historyRows}=await supabase.from('pools').select('id,name,sport,pool_type,season,is_active,created_at').eq('organization_id',pool.organization_id).eq('sport',pool.sport).eq('pool_type',pool.pool_type).order('season',{ascending:false});
+    const history=(historyRows||[]).filter(item=>normalizeSeriesName(item.name)===normalizeSeriesName(pool.name));
     const profileById=new Map((profiles||[]).map(profile=>[profile.id,profile]));
     const membersWithProfiles=(members||[]).map(member=>({...member,profile:profileById.get(member.user_id)||null}));
     const entriesWithProfiles=(entries||[]).map(entry=>({...entry,profile:profileById.get(entry.user_id)||null}));
@@ -59,7 +61,7 @@ export async function GET(_:Request,{params}:{params:Promise<{poolId:string}>}){
       return {entry_id:entry.id,entry_name:entry.entry_name,entry_status:entry.entry_status,wins,losses,pending,submitted:entryPicks.length};
     }).sort((a,b)=>Number(b.entry_status==='ACTIVE')-Number(a.entry_status==='ACTIVE')||b.wins-a.wins||a.losses-b.losses||a.entry_name.localeCompare(b.entry_name));
     const visiblePicks=picks.map(pick=>{const game=gameById.get(pick.game_id);return {...pick,week:pick.week??game?.week,locked:!!game&&(game.status!=='SCHEDULED'||new Date(game.kickoff_at).getTime()<=Date.now())};});
-    return NextResponse.json({pool,members:membersWithProfiles,entries:entriesWithProfiles,picks:visiblePicks,games:games||[],standings,latestScoringRun,audit:audit||[],history:history||[]});
+    return NextResponse.json({pool,members:membersWithProfiles,entries:entriesWithProfiles,picks:visiblePicks,games:games||[],standings,latestScoringRun,audit:audit||[],history});
   }catch(error){return failure(error);}
 }
 
