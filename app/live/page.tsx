@@ -8,6 +8,7 @@ type Prize = {
   title: string;
   week: number | null;
   eligible_count: number;
+  value_cents?: number | null;
   eligible_entries?: Entry[];
   prize_draws?: any[];
 };
@@ -151,7 +152,9 @@ export default function LiveDraw() {
       prizeId: selected?.id || "",
       prizeTitle: selected?.title || "Waiting for prize selection",
       week: selected?.week ?? null,
-      entries: eligible.slice(0, 24).map((entry) => entry.name),
+      // Send the complete eligible list so the viewer's wheel has the same
+      // number of segments as the verified server-side draw.
+      entries: eligible.map((entry) => entry.name),
       eligibleCount: count,
       rotation,
       drawing,
@@ -330,6 +333,11 @@ export default function LiveDraw() {
                 <b>Eligible entries</b>
                 <span>{count}</span>
               </div>
+              <div className="drawIntegrityNote">
+                The server will use a cryptographically secure random draw from
+                all {count} eligible entries. The result is saved and can be
+                verified after the spin.
+              </div>
               <div className="chips">
                 {eligible.slice(0, 100).map((e) => (
                   <span key={e.id}>{e.name}</span>
@@ -369,16 +377,21 @@ export default function LiveDraw() {
               }}
             >
               {shownEntries.length > 0 &&
-                shownEntries.map((e, i) => (
-                  <span
-                    key={e.id}
-                    style={{
-                      transform: `rotate(${(i * 360) / shownEntries.length}deg) translateY(-112px)`,
-                    }}
-                  >
-                    {e.name.slice(0, 12)}
-                  </span>
-                ))}
+                shownEntries.map((e, i) => {
+                  const labelStep = shownEntries.length > 60
+                    ? Math.ceil(shownEntries.length / 36)
+                    : 1;
+                  return i % labelStep === 0 ? (
+                    <span
+                      key={e.id}
+                      style={{
+                        transform: `rotate(${(i * 360) / shownEntries.length}deg) translateY(-112px)`,
+                      }}
+                    >
+                      {e.name.slice(0, 12)}
+                    </span>
+                  ) : null;
+                })}
             </div>
             {shownState?.winner && (
               <div className="winnerCard">
