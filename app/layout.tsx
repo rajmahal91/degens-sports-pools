@@ -3,11 +3,11 @@ import './install.css';
 import InstallApp from '@/components/InstallApp';
 
 export const metadata = {
-  title: 'Degens Sports Pools',
+  title: 'Sports Syndicate Fantasy',
   description: 'Multi-sport survivor, pick’em, bracket and prize draw platform',
-  applicationName: 'Degens Sports Pools',
+  applicationName: 'Sports Syndicate Fantasy',
   manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, statusBarStyle: 'black' as const, title: 'Degens Pools' },
+  appleWebApp: { capable: true, statusBarStyle: 'black' as const, title: 'Sports Syndicate Fantasy' },
   formatDetection: { telephone: false },
 };
 
