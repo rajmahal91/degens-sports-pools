@@ -537,10 +537,10 @@ export default function Home() {
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="homeBrand" href="/" aria-label="Degens Sports Pools home">
-          <div className="brand">DEGENS</div>
+        <a className="homeBrand" href="/" aria-label="Sports Syndicate Fantasy home">
+          <div className="brand">SPORTS SYNDICATE</div>
           <div className="subbrand">
-            SPORTS POOLS {connected ? "· CONNECTED" : "· DEMO"}
+            FANTASY {connected ? "· CONNECTED" : "· DEMO"}
           </div>
         </a>
         <div className="topActions">
