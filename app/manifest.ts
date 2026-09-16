@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest():MetadataRoute.Manifest{
   return {
-    id:'/',name:'Sports Syndicate Fantasy',short_name:'Sports Syndicate',description:'Sports pools, survivor picks, fantasy contests, standings and verified prize draws.',
+    id:'/',name:'Sports Syndicate Fantasy',short_name:'Sports Syndicate Fantasy',description:'Sports pools, survivor picks, fantasy contests, standings and verified prize draws.',
     start_url:'/',scope:'/',display:'standalone',background_color:'#080a0f',theme_color:'#080a0f',orientation:'portrait-primary',
     categories:['sports','entertainment'],
     icons:[
