@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (!season || !week) return NextResponse.json({ error: 'season and week are required' }, { status: 400 });
 
   try {
-    return NextResponse.json(await syncAndGradeNFLWeek(Number(season),Number(week),seasonType));
+    return NextResponse.json(await syncAndGradeNFLWeek(Number(season),Number(week),seasonType,undefined,undefined,{trigger:'admin',recordRun:true}));
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Grading failed' }, { status: 500 });
   }

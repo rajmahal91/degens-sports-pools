@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/auth';
 import { syncAndGradeNFLWeek } from '@/lib/sports/nfl-operations';
 
 const refreshWeek=unstable_cache(
-  async (season:number,week:number)=>syncAndGradeNFLWeek(season,week),
+  async (season:number,week:number)=>syncAndGradeNFLWeek(season,week,'REG',undefined,undefined,{recordRun:false}),
   ['nfl-live-score-refresh'],
   {revalidate:60},
 );

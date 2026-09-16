@@ -92,11 +92,24 @@ class ESPNProvider implements NFLProvider {
   async gamesByWeek(season:string,week:number,seasonType:'REG'|'POST'='REG'){
     const seasonTypeNumber=seasonType==='POST'?3:2;
     const url=`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${encodeURIComponent(season)}&seasontype=${seasonTypeNumber}&week=${week}`;
-    const response=await fetch(url,{cache:'no-store'});
-    if(!response.ok)throw new Error(`ESPN score sync failed (${response.status}).`);
+    let response:Response|undefined;
+    let lastError:unknown;
+    for(let attempt=1;attempt<=3;attempt++){
+      try{
+        response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(12000)});
+        if(response.ok)break;
+        lastError=new Error(`ESPN score sync failed (${response.status}).`);
+        if(response.status<500&&response.status!==429)break;
+      }catch(error){lastError=error;}
+      if(attempt<3)await new Promise(resolve=>setTimeout(resolve,250*attempt));
+    }
+    if(!response?.ok)throw lastError instanceof Error?lastError:new Error('ESPN score sync failed.');
     const payload=await response.json();
+    if(!Array.isArray(payload.events)||payload.events.length===0){
+      throw new Error(`ESPN returned no NFL games for ${season} ${seasonType} week ${week}; existing scores were left unchanged.`);
+    }
     console.info('[nfl/espn] scoreboard received',{season,week,events:Array.isArray(payload.events)?payload.events.length:0,markets:(payload.events||[]).filter((event:any)=>event.competitions?.[0]?.odds?.length).length});
-    return (payload.events||[]).map((event:any)=>{
+    const games=(payload.events||[]).map((event:any)=>{
       const competition=event.competitions?.[0];
       const home=competition?.competitors?.find((team:any)=>team.homeAway==='home');
       const away=competition?.competitors?.find((team:any)=>team.homeAway==='away');
@@ -104,6 +117,16 @@ class ESPNProvider implements NFLProvider {
       const market=noVigProbabilities(odds?.awayTeamOdds?.moneyLine??odds?.moneyline?.away?.close?.odds,odds?.homeTeamOdds?.moneyLine??odds?.moneyline?.home?.close?.odds);
       return {id:String(event.id),season,week,seasonType,awayTeamCode:String(away?.team?.abbreviation||''),homeTeamCode:String(home?.team?.abbreviation||''),startsAt:new Date(event.date).toISOString(),status:normalizeStatus(event.status?.type?.description,event.status?.type?.completed),awayScore:away?.score==null?null:Number(away.score),homeScore:home?.score==null?null:Number(home.score),awayWinProbability:market?.away??null,homeWinProbability:market?.home??null,marketProvider:market?String(odds?.provider?.name||'Market'):null};
     }).filter((game:any)=>game.id&&game.awayTeamCode&&game.homeTeamCode);
+    if(games.length!==payload.events.length){
+      throw new Error('ESPN returned incomplete NFL game data; existing scores were left unchanged.');
+    }
+    for(const game of games){
+      if(!Number.isFinite(new Date(game.startsAt).getTime()))throw new Error('ESPN returned an invalid NFL kickoff time.');
+      if(game.status==='FINAL'&&(!Number.isFinite(game.awayScore)||!Number.isFinite(game.homeScore)||Number(game.awayScore)<0||Number(game.homeScore)<0)){
+        throw new Error('ESPN returned an invalid final score; existing scores were left unchanged.');
+      }
+    }
+    return games;
   }
   async players(){return [];}
   async playerStatsByWeek(){return [];}
