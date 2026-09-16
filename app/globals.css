@@ -44,41 +44,30 @@ body {
   align-items: flex-start;
   padding-left: 10px;
   border-left: 4px solid var(--accent);
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.34));
 }
 .brand {
-  display: inline-block;
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif;
-  font-size: clamp(18px, 5.4vw, 28px);
-  font-weight: 950;
-  font-style: italic;
-  line-height: 0.9;
-  letter-spacing: 0.025em;
+  font-family: "Arial Black", "Trebuchet MS", Arial, sans-serif;
+  font-size: clamp(17px, 4.8vw, 25px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.015em;
   text-transform: uppercase;
-  transform: skewX(-7deg);
-  transform-origin: left center;
-  background: linear-gradient(180deg, #fff7c7 0%, #f4c94d 38%, #c88a12 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-stroke: 0.5px rgba(255, 226, 113, 0.48);
-  text-shadow: 0 2px 0 rgba(34, 22, 0, 0.75);
+  color: #ffffff;
+  -webkit-text-stroke: 0.35px rgba(244, 201, 77, 0.8);
+  text-shadow:
+    0 2px 0 #7b5410,
+    0 3px 8px rgba(0, 0, 0, 0.42);
   white-space: nowrap;
 }
 .subbrand {
   margin-top: 5px;
-  padding: 2px 9px 2px 7px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent), #d69920);
-  color: #080a0f;
-  font-family: "Arial Black", Impact, sans-serif;
-  font-size: 9px;
-  font-style: italic;
-  line-height: 1.15;
-  letter-spacing: 0.28em;
-  font-weight: 950;
+  color: var(--accent);
+  font-family: "Trebuchet MS", Arial, sans-serif;
+  font-size: 10px;
+  line-height: 1.1;
+  letter-spacing: 0.22em;
+  font-weight: 900;
   text-transform: uppercase;
-  transform: skewX(-7deg);
 }
 .avatar {
   width: 42px;
