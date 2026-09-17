@@ -926,6 +926,50 @@ p {
   background: #1b3150;
   box-shadow: 0 0 0 1px #2d8cff, 0 6px 16px rgba(45, 140, 255, 0.18);
 }
+.weekPicker {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #101722;
+}
+.weekPicker label {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.weekPicker select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 38px 10px 13px;
+  border: 1px solid #3a465a;
+  border-radius: 12px;
+  background: #182131;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.weekPicker select:focus {
+  outline: 2px solid #2d8cff;
+  outline-offset: 2px;
+}
+@media (max-width: 520px) {
+  .weekPicker {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding: 11px 12px;
+  }
+  .weekPicker select {
+    min-height: 48px;
+  }
+}
+
 .entryTabs button {
   min-width: 120px;
   border: 1px solid var(--line);
