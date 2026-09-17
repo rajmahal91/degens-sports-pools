@@ -1182,37 +1182,40 @@ export default function Home() {
             refreshToken={receiptRefreshToken}
           />
           {(pickMode === "survivor" || pickMode === "pickem") && (
-            <nav className="weekTabs" aria-label="Choose an NFL week">
-              {Array.from({ length: 18 }, (_, index) => index + 1).map((week) => {
-                const weekGames = games.filter((game) => game.week === week);
-                const survivorSaved = survivorPicks.some(
-                  (pick) => pick.entryId === activeSurvivor?.id && pick.week === week,
-                );
-                const weekGameIds = new Set(weekGames.map((game) => game.id));
-                const pickemSaved = pickem.filter(
-                  (pick) => pick.entryId === pickemEntry?.id && weekGameIds.has(pick.gameId),
-                ).length;
-                const status = pickMode === "survivor"
-                  ? survivorSaved ? "Pick saved" : "Not picked"
-                  : weekGames.length ? `${pickemSaved}/${weekGames.length} saved` : "Schedule pending";
-                return (
-                  <button
-                    type="button"
-                    key={week}
-                    className={`${pickWeek === week ? "weekActive" : ""} ${week === currentWeek ? "weekCurrent" : ""} ${survivorSaved || (weekGames.length > 0 && pickemSaved === weekGames.length) ? "weekComplete" : ""}`}
-                    onClick={() => {
-                      setPickWeek(week);
-                      setPendingSurvivor(null);
-                      setPickemSubmitted(false);
-                      setNotice(null);
-                    }}
-                  >
-                    <strong>Week {week}</strong>
-                    <small>{status}</small>
-                  </button>
-                );
-              })}
-            </nav>
+            <div className="weekPicker">
+              <label htmlFor="pool-week-select">Select week</label>
+              <select
+                id="pool-week-select"
+                value={pickWeek}
+                onChange={(event) => {
+                  const week = Number(event.target.value);
+                  setPickWeek(week);
+                  setPendingSurvivor(null);
+                  setPickemSubmitted(false);
+                  setNotice(null);
+                }}
+              >
+                {Array.from({ length: 18 }, (_, index) => index + 1).map((week) => {
+                  const weekGames = games.filter((game) => game.week === week);
+                  const survivorSaved = survivorPicks.some(
+                    (pick) => pick.entryId === activeSurvivor?.id && pick.week === week,
+                  );
+                  const weekGameIds = new Set(weekGames.map((game) => game.id));
+                  const pickemSaved = pickem.filter(
+                    (pick) => pick.entryId === pickemEntry?.id && weekGameIds.has(pick.gameId),
+                  ).length;
+                  const status = pickMode === "survivor"
+                    ? survivorSaved ? "Pick saved" : "Not picked"
+                    : weekGames.length ? `${pickemSaved}/${weekGames.length} saved` : "Schedule pending";
+                  const currentLabel = week === currentWeek ? " — Current" : "";
+                  return (
+                    <option key={week} value={week}>
+                      Week {week}{currentLabel} — {status}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           )}
           {pickMode === "survivor" && (
             <>
