@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { syncAndGradeNFLWeek } from '@/lib/sports/nfl-operations';
 
 async function managerContext(poolId:string){
@@ -15,6 +16,24 @@ async function managerContext(poolId:string){
   const canManage=organization?.owner_user_id===user.id||(orgMember?.status==='ACTIVE'&&['OWNER','ADMIN','COMMISSIONER'].includes(orgMember.role))||(leagueMember?.status==='ACTIVE'&&['COMMISSIONER','CO_COMMISSIONER'].includes(leagueMember.role));
   if(!canManage) throw new Error('FORBIDDEN');
   return {supabase,user,pool};
+}
+
+async function deleteLeague(poolId:string){
+  const admin=createAdminClient();
+  const {data:entries,error:entriesError}=await admin.from('entries').select('id').eq('pool_id',poolId);
+  if(entriesError)throw entriesError;
+  const entryIds=(entries||[]).map(entry=>entry.id);
+  for(const table of ['survivor_picks','pickem_picks','playoff_fantasy_picks','bracket_picks','pick_receipts']){
+    if(entryIds.length){const {error}=await admin.from(table).delete().in('entry_id',entryIds);if(error)throw error;}
+  }
+  for(const table of ['bracket_matchups','rounds','entries','league_members','league_invitations','prize_draws','prizes','scoring_runs']){
+    const {error}=await admin.from(table).delete().eq('pool_id',poolId);
+    if(error)throw error;
+  }
+  const {error:auditError}=await admin.from('commissioner_audit_log').delete().eq('entity_id',poolId);
+  if(auditError)throw auditError;
+  const {error:poolError}=await admin.from('pools').delete().eq('id',poolId);
+  if(poolError)throw poolError;
 }
 
 function failure(error:unknown){
@@ -86,6 +105,16 @@ export async function PATCH(request:Request,{params}:{params:Promise<{poolId:str
 export async function POST(request:Request,{params}:{params:Promise<{poolId:string}>}){
   try{
     const {poolId}=await params;const {supabase,user,pool}=await managerContext(poolId);const body=await request.json();
+    if(body.action==='delete_league'){
+      const [{data:organization},{data:leadCommissioner}]=await Promise.all([
+        supabase.from('organizations').select('owner_user_id').eq('id',pool.organization_id).maybeSingle(),
+        supabase.from('league_members').select('role,status').eq('pool_id',poolId).eq('user_id',user.id).maybeSingle(),
+      ]);
+      const canDelete=pool.created_by===user.id||organization?.owner_user_id===user.id||(leadCommissioner?.status==='ACTIVE'&&leadCommissioner.role==='COMMISSIONER');
+      if(!canDelete)return NextResponse.json({error:'Only the lead commissioner can delete this league.'},{status:403});
+      await deleteLeague(poolId);
+      return NextResponse.json({success:true});
+    }
     if(body.action==='regenerate_invite'){
       const inviteCode=randomBytes(4).toString('hex').toUpperCase();
       const codeHash=createHash('sha256').update(inviteCode).digest('hex');
