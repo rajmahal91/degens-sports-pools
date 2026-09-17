@@ -74,6 +74,11 @@ body {
 .homeBrandTitle .brandSyndicate {
   color: var(--accent);
 }
+.homeBrandTitle .brandSports,
+.homeBrandTitle .brandSyndicate {
+  -webkit-text-stroke: 0.65px rgba(255, 255, 255, 0.95);
+  paint-order: stroke fill;
+}
 .subbrand {
   margin-top: 5px;
   color: var(--accent);
