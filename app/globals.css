@@ -1757,6 +1757,10 @@ p {
 .dangerZone .dangerButton {
   width: 100%;
 }
+.dangerZone .dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 .settingsPair {
   display: grid;
   grid-template-columns: 1fr 1fr;
