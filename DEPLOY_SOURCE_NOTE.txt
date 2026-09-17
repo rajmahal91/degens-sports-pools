@@ -4,3 +4,4 @@ Deployment trigger: compact week dropdown UI.
 Deployment trigger: hide player proof panel.
 Deployment trigger: player confirmation-only screen.
 Deployment retry check.
+Deployment trigger: require typing delete before league removal.
