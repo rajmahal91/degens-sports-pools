@@ -671,7 +671,6 @@ export default function Home() {
         body: JSON.stringify({ entryId, gameId, teamCode }),
       });
       if (r.ok) {
-        setReceiptRefreshToken((value) => value + 1);
         return;
       }
       const j = await r.json();
