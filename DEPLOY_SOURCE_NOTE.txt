@@ -1,1 +1,3 @@
 Direct source deployment enabled. The application source is committed directly to GitHub; Vercel should use the standard Next.js install/build flow.
+
+Deployment trigger: compact week dropdown UI.
