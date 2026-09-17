@@ -26,7 +26,11 @@ async function deleteLeague(poolId:string){
   for(const table of ['survivor_picks','pickem_picks','playoff_fantasy_picks','bracket_picks','pick_receipts']){
     if(entryIds.length){const {error}=await admin.from(table).delete().in('entry_id',entryIds);if(error)throw error;}
   }
-  for(const table of ['bracket_matchups','rounds','entries','league_members','league_invitations','prize_draws','prizes','scoring_runs']){
+  const {data:prizes,error:prizesError}=await admin.from('prizes').select('id').eq('pool_id',poolId);
+  if(prizesError)throw prizesError;
+  const prizeIds=(prizes||[]).map(prize=>prize.id);
+  if(prizeIds.length){const {error}=await admin.from('prize_draws').delete().in('prize_id',prizeIds);if(error)throw error;}
+  for(const table of ['bracket_matchups','rounds','entries','league_members','league_invitations','prizes','scoring_runs']){
     const {error}=await admin.from(table).delete().eq('pool_id',poolId);
     if(error)throw error;
   }
