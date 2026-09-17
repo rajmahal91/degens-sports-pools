@@ -1,36 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deadlineForWeek,pickLockAt } from '@/lib/sports/nfl-operations';
-import { sendWebPush,type StoredPushSubscription } from '@/lib/notifications/web-push';
+import { deliverNotification,groupPreferences,groupSubscriptions } from '@/lib/notifications/delivery';
 
 type Reminder={userId:string;poolId:string;entryId:string;type:'ONE_DAY'|'ONE_HOUR'|'MISSED';dedupeKey:string;title:string;body:string;url:string};
 
 function windowFor(target:Date,now:Date){
   const minutes=(target.getTime()-now.getTime())/60000;
-  if(minutes>=22*60&&minutes<=30*60)return 'ONE_DAY' as const;
+  if(minutes>=18*60&&minutes<=36*60)return 'ONE_DAY' as const;
   if(minutes>=30&&minutes<=90)return 'ONE_HOUR' as const;
   if(minutes<=0&&minutes>=-24*60)return 'MISSED' as const;
   return null;
-}
-
-async function deliver(admin:any,reminder:Reminder,subscriptionsByUser:Map<string,any[]>,preferencesByUser:Map<string,any>){
-  const preferences=preferencesByUser.get(reminder.userId);
-  if(preferences?.push_enabled===false||preferences?.pick_reminders===false)return {sent:0,skipped:1};
-  const subscriptions=subscriptionsByUser.get(reminder.userId)||[];
-  if(!subscriptions.length)return {sent:0,skipped:1};
-  const {data:delivery,error}=await admin.from('notification_deliveries').insert({user_id:reminder.userId,dedupe_key:reminder.dedupeKey,notification_type:`PICK_${reminder.type}`,title:reminder.title,body:reminder.body,target_url:reminder.url,status:'PENDING'}).select('id').maybeSingle();
-  if(error){if(error.code==='23505')return {sent:0,skipped:1};throw error;}
-  if(!delivery)return {sent:0,skipped:1};
-  let sent=0;let lastError='';
-  for(const subscription of subscriptions){
-    try{await sendWebPush(subscription as StoredPushSubscription,{title:reminder.title,body:reminder.body,url:reminder.url,tag:reminder.dedupeKey});sent++;}
-    catch(error){
-      lastError=error instanceof Error?error.message:String(error);
-      const status=(error as Error&{status?:number}).status;
-      if(status===404||status===410)await admin.from('push_subscriptions').update({disabled_at:new Date().toISOString()}).eq('id',subscription.id);
-    }
-  }
-  await admin.from('notification_deliveries').update({status:sent?'SENT':'FAILED',error_message:sent?null:lastError,sent_at:sent?new Date().toISOString():null}).eq('id',delivery.id);
-  return {sent,skipped:0};
 }
 
 export async function sendPickReminders(now=new Date()){
@@ -58,8 +37,8 @@ export async function sendPickReminders(now=new Date()){
   const gamesByWeek=new Map<string,any[]>();for(const game of games||[]){const key=`${game.season}-${game.week}`;gamesByWeek.set(key,[...(gamesByWeek.get(key)||[]),game]);}
   const survivorSet=new Set((survivorPicks||[]).map((pick:any)=>`${pick.entry_id}-${pick.week}`));
   const pickemSet=new Set((pickemPicks||[]).map((pick:any)=>`${pick.entry_id}-${pick.game_id}`));
-  const subscriptionsByUser=new Map<string,any[]>();for(const subscription of subscriptions||[])subscriptionsByUser.set(subscription.user_id,[...(subscriptionsByUser.get(subscription.user_id)||[]),subscription]);
-  const preferencesByUser=new Map((preferences||[]).map((preference:any)=>[preference.user_id,preference]));
+  const subscriptionsByUser=groupSubscriptions(subscriptions||[]);
+  const preferencesByUser=groupPreferences(preferences||[]);
   const reminders:Reminder[]=[];
   for(const entry of entries||[]){
     const pool=poolById.get(entry.pool_id);if(!pool)continue;
@@ -82,6 +61,6 @@ export async function sendPickReminders(now=new Date()){
       }
     }
   }
-  let sent=0;let skipped=0;for(const reminder of reminders){const result=await deliver(admin,reminder,subscriptionsByUser,preferencesByUser);sent+=result.sent;skipped+=result.skipped;}
+  let sent=0;let skipped=0;for(const reminder of reminders){const result=await deliverNotification(admin,{...reminder,notificationType:`PICK_${reminder.type}`,preference:'pick_reminders'},subscriptionsByUser,preferencesByUser);sent+=result.sent;skipped+=result.skipped;}
   return {candidates:reminders.length,sent,skipped};
 }

@@ -1820,6 +1820,11 @@ p {
   gap: 6px;
   width: 100%;
 }
+.notificationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .dangerButton {
   border-color: #7d3740 !important;
   background: #3a1820 !important;

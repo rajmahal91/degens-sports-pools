@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getNFLScoreProvider } from '@/lib/sports/provider';
 import { calculateFullPprPoints } from '@/lib/sports/fantasy-scoring';
+import { sendNFLResultNotifications } from '@/lib/notifications/results';
 
 type SeasonType = 'REG' | 'POST';
 type ScoringTrigger = 'cron' | 'commissioner' | 'admin';
@@ -207,7 +208,12 @@ export async function syncAndGradeNFLWeek(season:number,week:number,seasonType:S
   try{
     const sync=await syncNFLWeek(season,week,seasonType,client);
     const grading=seasonType==='POST'?await gradeNFLFantasyRound(season,week,client):await gradeNFLWeek(season,week,new Date(),client,poolId);
-    const result={...sync,...grading,runId};
+    let notifications:unknown={skipped:true};
+    if(seasonType==='REG'){
+      try{notifications=await sendNFLResultNotifications(season,week,poolId);}
+      catch(error){notifications={error:messageFrom(error)};console.error('[nfl/notifications] delivery failed',{season,week,poolId,error:messageFrom(error)});}
+    }
+    const result={...sync,...grading,notifications,runId};
     if(audit&&runId){
       const {error}=await audit.from('scoring_runs').update({status:'SUCCEEDED',provider:sync.provider,details:result,completed_at:new Date().toISOString()}).eq('id',runId);
       if(error)console.error('[nfl/scoring] could not complete audit',{runId,error:error.message});

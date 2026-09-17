@@ -27,7 +27,7 @@ export default function NotificationSettings(){
       const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeKey(keyBody.publicKey)});
       const response=await fetch('/api/notifications/subscribe',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({subscription:subscription.toJSON()})});
       const body=await response.json();if(!response.ok)throw new Error(body.error||'Could not enable notifications.');
-      setMessage('Pick reminders are enabled on this device.');await load();
+      setMessage('Notifications are enabled on this device.');await load();
     }catch(error){setMessage(error instanceof Error?error.message:'Could not enable notifications.');}finally{setBusy(false);}
   }
   async function disable(){
@@ -38,5 +38,10 @@ export default function NotificationSettings(){
       await subscription?.unsubscribe();setMessage('Notifications are disabled on this device.');await load();
     }catch{setMessage('Could not disable notifications.');}finally{setBusy(false);}
   }
-  return <section className="notificationSettings"><span className="eyebrow">PICK REMINDERS</span><h2>Push notifications</h2><p>Get a reminder before your Survivor or Pick’em deadline and a notice if a pick was missed.</p>{!supported&&<div className="warning">This browser does not support push notifications. On iPhone, add the app to your Home Screen first.</div>}{status&&!status.configured&&<div className="warning">Push delivery is not configured yet.</div>}{status?.enabled?<button className="secondary" type="button" disabled={busy} onClick={disable}>{busy?'Updating…':'Disable notifications'}</button>:<button className="primary" type="button" disabled={busy||!supported||status?.configured===false}>{busy?'Enabling…':'Enable pick reminders'}</button>}{message&&<div className={message.includes('enabled')||message.includes('disabled')?'notice':'warning'}>{message}</div>}</section>;
+  async function test(){
+    setBusy(true);setMessage('');
+    try{const response=await fetch('/api/notifications/test',{method:'POST'});const body=await response.json();if(!response.ok)throw new Error(body.error||'Could not send a test notification.');setMessage('Test notification sent.');}
+    catch(error){setMessage(error instanceof Error?error.message:'Could not send a test notification.');}finally{setBusy(false);}
+  }
+  return <section className="notificationSettings"><span className="eyebrow">POOL ALERTS</span><h2>Push notifications</h2><p>Get Survivor and Pick’em deadline reminders, missed-pick alerts, eliminations, and weekly results.</p>{!supported&&<div className="warning">This browser does not support push notifications. On iPhone, add the app to your Home Screen first.</div>}{status&&!status.configured&&<div className="warning">Push delivery is not configured yet.</div>}{status?.enabled?<div className="notificationActions"><button className="primary" type="button" disabled={busy} onClick={test}>{busy?'Sending…':'Send test notification'}</button><button className="secondary" type="button" disabled={busy} onClick={disable}>Disable notifications</button></div>:<button className="primary" type="button" disabled={busy||!supported||status?.configured===false} onClick={enable}>{busy?'Enabling…':'Enable notifications'}</button>}{message&&<div className={message.includes('enabled')||message.includes('disabled')||message.includes('sent')?'notice':'warning'}>{message}</div>}</section>;
 }
