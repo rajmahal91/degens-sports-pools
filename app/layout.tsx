@@ -1,6 +1,7 @@
 import './globals.css';
 import './install.css';
 import InstallApp from '@/components/InstallApp';
+import NativeAppBridge from '@/components/NativeAppBridge';
 
 export const metadata = {
   title: 'Sports Syndicate Fantasy',
@@ -14,5 +15,5 @@ export const metadata = {
 export const viewport = { themeColor: '#080a0f', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body>{children}<InstallApp/></body></html>;
+  return <html lang="en"><body><NativeAppBridge/>{children}<InstallApp/></body></html>;
 }
