@@ -1846,6 +1846,13 @@ p {
   background: #3a1820 !important;
   color: #ffb7bd !important;
 }
+.accountDeleteLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  text-decoration: none;
+}
 @media (max-width: 760px) {
   .leagueAdminGrid {
     grid-template-columns: 1fr;

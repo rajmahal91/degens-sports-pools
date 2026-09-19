@@ -85,6 +85,7 @@ export default function AccountPage() {
         {message && <div className="notice">{message}</div>}
         <button className="primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Account"}</button>
         <NotificationSettings />
+        <a className="dangerButton accountDeleteLink" href="/account/delete">Delete Account</a>
         <button className="dangerButton" type="button" onClick={signOut}>Sign Out</button>
       </form>
     </main>

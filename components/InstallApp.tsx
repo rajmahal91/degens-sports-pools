@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect,useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 interface InstallPromptEvent extends Event{prompt:()=>Promise<void>;userChoice:Promise<{outcome:'accepted'|'dismissed'}>}
 
 export default function InstallApp(){
   const [prompt,setPrompt]=useState<InstallPromptEvent|null>(null);const [open,setOpen]=useState(false);const [hidden,setHidden]=useState(true);
   useEffect(()=>{
+    if(Capacitor.isNativePlatform())return;
     if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>undefined);
     const standalone=window.matchMedia('(display-mode: standalone)').matches||('standalone' in navigator&&(navigator as Navigator&{standalone?:boolean}).standalone===true);
     if(standalone)return;

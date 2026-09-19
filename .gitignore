@@ -5,3 +5,16 @@ node_modules/
 .vercel/
 *.tsbuildinfo
 .DS_Store
+
+# Native signing and push credentials (never commit these)
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+android/keystore.properties
+android/app/google-services.json
+ios/App/App/GoogleService-Info.plist
+
+# Supabase CLI state
+supabase/.temp/
