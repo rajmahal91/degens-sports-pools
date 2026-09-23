@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sports Syndicate Fantasy</string>
+    <string name="title_activity_main">Sports Syndicate Fantasy</string>
+    <string name="package_name">com.sportssyndicate.fantasy</string>
+    <string name="custom_url_scheme">com.sportssyndicate.fantasy</string>
+</resources>
