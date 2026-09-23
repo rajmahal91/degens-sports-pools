@@ -4,6 +4,7 @@
   "crons": [
     { "path": "/api/cron/nfl", "schedule": "0 7 * * *" },
     { "path": "/api/cron/notifications", "schedule": "0 16 * * *" },
-    { "path": "/api/cron/playoffs", "schedule": "0 6 * * *" }
+    { "path": "/api/cron/playoffs", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/supabase-keepalive", "schedule": "0 12 * * *" }
   ]
 }
