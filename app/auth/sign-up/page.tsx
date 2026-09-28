@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/app-errors";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,23}$/;
 
@@ -52,7 +53,7 @@ export default function SignUpPage() {
       if (error) throw error;
       setMessage("Account created. Check your email to confirm it, then sign in.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Sign-up failed");
+      setMessage(friendlyError(error, "We could not create your account. Please try again."));
     } finally {
       setSubmitting(false);
     }
