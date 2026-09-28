@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/app-errors';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -38,7 +39,7 @@ export default function LoginPage() {
 
       window.location.replace(next);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Login failed');
+      setMessage(friendlyError(error, 'We could not sign you in. Please try again.'));
     }
   }
 
