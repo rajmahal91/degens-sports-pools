@@ -20,12 +20,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !key) {
+  if (!configuredUrl || !key) {
     return NextResponse.json(
       { ok: false, error: 'Supabase public credentials are not configured.' },
       { status: 503 },
@@ -33,10 +34,14 @@ export async function GET(request: Request) {
   }
 
   try {
+    const url = configuredUrl.endsWith('/')
+      ? configuredUrl.slice(0, -1)
+      : configuredUrl;
+
     // Use the public REST API so this counts as normal database activity on
     // Supabase free projects. The query is read-only and RLS-safe.
     const response = await fetch(
-      `${url.replace(/\\/$/, '')}/rest/v1/profiles?select=id&limit=1`,
+      `${url}/rest/v1/profiles?select=id&limit=1`,
       {
         headers: {
           apikey: key,
